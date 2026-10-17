@@ -1,5 +1,25 @@
 # DPS meter
 
-- [ ] Look at the existing code Snider points at, write down what it does here
-- [ ] Decide: where the numbers come from, what we show (per player, per fight, boss vs trash)
-- [ ] Maybe: post a fight summary to the static's Discord via the Groot bot
+## Decided
+- **Source: passive packet capture via Npcap.** We read copies of the game's traffic and never touch the client: no memory reads, no hooks, no injection, no packets sent. That's the safety line. If it needs more than sniffing, we don't do it.
+- **DPS first.** Loot, drops and the rest come later, but we note every data point we spot along the way (see below).
+- Built on CoreGO (`~/Code/core`).
+
+## Open questions
+- [ ] Is the traffic readable? Plaintext, compressed, or encrypted? Look at how the existing meters on GitHub decode it. If it's encrypted, decide whether that crosses the safety line.
+- [ ] Capture from Go on Windows: gopacket/pcap (cgo + Npcap SDK) vs a pure-Go Npcap binding. The game runs on Windows, so we need a Windows box or a `.pcap` someone captures for us to develop against.
+- [ ] What we show: per player, per fight, boss vs trash, skill breakdown.
+- [ ] Maybe: post a fight summary to the static's Discord via the Groot bot (a `g!` command, not a second bot).
+
+## Plan
+1. Get a `.pcap` of a short fight from a static member (Npcap + Wireshark, filtered to the game's ports).
+2. TDD the decoder against that capture: packet → damage event.
+3. Aggregate: events → per-player DPS per fight (pure and fully tested).
+4. Thin live layer: Npcap capture → decoder → aggregator → CoreGO window.
+
+## Data points spotted (for later)
+Running list of what the packets give us, even if we don't use it yet. The aim is a **drop database**, so a session can answer "where's my best luck for Expert Refinement Stones?". That needs loot events with item, source mob or boss, zone and time.
+
+| Data point | Packet / opcode | Fields | Seen in | Notes |
+|---|---|---|---|---|
+| _(none yet)_ | | | | |
