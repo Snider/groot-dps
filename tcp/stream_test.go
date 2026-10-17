@@ -70,3 +70,21 @@ func TestLostSegmentGivesUpAndReportsGap(t *testing.T) {
 		t.Fatalf("lost the newest segment: %q", out)
 	}
 }
+
+func FuzzStream(f *testing.F) {
+	f.Add(uint32(100), []byte("abc"), uint32(106), []byte("ghi"), uint32(103), []byte("def"))
+	f.Fuzz(func(t *testing.T, s1 uint32, p1 []byte, s2 uint32, p2 []byte, s3 uint32, p3 []byte) {
+		var s Stream
+		total := 0
+		for _, seg := range []struct {
+			seq uint32
+			p   []byte
+		}{{s1, p1}, {s2, p2}, {s3, p3}} {
+			out, _ := s.Push(seg.seq, seg.p)
+			total += len(out)
+		}
+		if total > len(p1)+len(p2)+len(p3) {
+			t.Fatalf("emitted %d bytes from %d in", total, len(p1)+len(p2)+len(p3))
+		}
+	})
+}

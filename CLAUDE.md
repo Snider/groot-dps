@@ -33,3 +33,15 @@
 - Built on Snider's own Go native app framework (CoreGO at `~/Code/core`, already attached to the session; no `/add-dir` needed). No DPS code exists yet.
 - Why: the static wants a meter, and Snider building it means friends can trust what they run. So: open source, readable, no telemetry, nothing sneaky. Trust is the feature.
 - Ideas and next steps go in `plans/`.
+
+## How we build it (learnt as we go)
+- **Safety line:** passive capture only. Read a copy of the traffic and never touch the client or send anything. If a feature needs more, we don't build it.
+- **Trust is the feature:** no telemetry, no network calls of our own (Discord goes through the Groot bot), few dependencies, pure Go where we can. Friends should be able to read it and build it themselves.
+- **Every packet is suspect.** Bounds-check everything, cap sizes and nesting, never panic. Each decoder gets a fuzz test (`wire/fuzz_test.go`). The 2026-10-17 decompression-bomb fix is why.
+- **Synthetic tests prove our reading, not the game.** Tests built from our own packets only show we match our notes. Every decoder also needs a **golden test**: a real packet from a capture, saved as hex, with the expected decode.
+- **Captures are private.** They contain names. `.pcap`/`.pcapng` stay out of git. Golden packets get trimmed to the one packet and names scrubbed before they're committed.
+- **Unknown fields stay named `unknown`.** They're documented in `plans/protocol.md`. When we work one out, update the notes and the tests together. Every new data point goes in the `plans/dps-meter.md` table.
+- **GPL-3 reference:** borrow concepts from Kuroukihime's meter and write our own code. Credit it in the README.
+- **Before committing:** `./check.sh` (gofmt, vet, tests, Windows build). `./check.sh fuzz` after touching a decoder.
+- **Open:** what licence do we ship under? Releases need checksums so the static can verify what they run.
+
