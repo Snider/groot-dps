@@ -8,7 +8,7 @@ import (
 
 const (
 	maxNesting      = 8
-	maxDecompressed = 10_000_000
+	maxDecompressed = 10_000_000 // total per Unpack call, across all nested containers
 )
 
 // Opcode reads the 2-byte opcode after the length varint.
@@ -27,12 +27,14 @@ func Unpack(p []byte) [][]byte {
 		return [][]byte{p}
 	}
 	var out [][]byte
-	walk(p, &out, 0)
+	budget := maxDecompressed
+	walk(p, &out, 0, &budget)
 	return out
 }
 
 // walk scans buf as a run of frames, opening containers as it goes.
-func walk(buf []byte, out *[][]byte, depth int) {
+// budget is the decompressed bytes still allowed for this packet.
+func walk(buf []byte, out *[][]byte, depth int, budget *int) {
 	for pos := 0; pos < len(buf); {
 		if buf[pos] == 0x00 { // padding between frames
 			pos++
@@ -52,8 +54,12 @@ func walk(buf []byte, out *[][]byte, depth int) {
 			return
 		}
 		f := buf[pos:end]
-		if inner, ok := decompress(f); ok && depth < maxNesting {
-			walk(inner, out, depth+1)
+		if _, isContainer := containerHeader(f); isContainer {
+			if depth < maxNesting {
+				if inner, ok := decompress(f, budget); ok {
+					walk(inner, out, depth+1, budget)
+				}
+			}
 		} else if size > n {
 			*out = append(*out, f)
 		}
@@ -79,15 +85,17 @@ func containerHeader(f []byte) (int, bool) {
 }
 
 // decompress opens a container frame: FF FF, u32 LE size, LZ4 block.
-func decompress(f []byte) ([]byte, bool) {
+// The claimed size comes out of budget before anything is allocated.
+func decompress(f []byte, budget *int) ([]byte, bool) {
 	h, ok := containerHeader(f)
 	if !ok || len(f) < h+6 {
 		return nil, false
 	}
 	size := binary.LittleEndian.Uint32(f[h+2:])
-	if size == 0 || size > maxDecompressed {
+	if size == 0 || int(size) > *budget {
 		return nil, false
 	}
+	*budget -= int(size)
 	out := make([]byte, size)
 	k, err := lz4.UncompressBlock(f[h+6:], out)
 	if err != nil || k <= 0 {

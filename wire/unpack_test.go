@@ -76,3 +76,18 @@ func TestUnpackGarbageContainerDoesNotPanic(t *testing.T) {
 	Unpack(frame([]byte{0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0x7F, 1}))
 	Unpack(frame([]byte{0xFF, 0xFF}))
 }
+
+func TestDecompressRespectsBudget(t *testing.T) {
+	c := container(pkt(0x3804, filler(40)...))
+	small := 10
+	if _, ok := decompress(c, &small); ok {
+		t.Fatal("decompressed past the budget")
+	}
+	if small != 10 {
+		t.Fatalf("budget spent on a refused container: %d", small)
+	}
+	big := 1000
+	if _, ok := decompress(c, &big); !ok || big >= 1000 {
+		t.Fatalf("ok=%v budget=%d", ok, big)
+	}
+}
