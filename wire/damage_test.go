@@ -42,12 +42,12 @@ func TestParseDamageSwitchFourHasNoFlagBytes(t *testing.T) {
 
 func TestParseDamageRejects(t *testing.T) {
 	cases := map[string][]byte{
-		"wrong opcode":  pkt(0x3805, damageBody(7, 0x04, 8, 1000, 1, make([]byte, 8), 9)...),
-		"bad switch":    pkt(OpDamage, damageBody(7, 0x03, 8, 1000, 1, make([]byte, 8), 9)...),
-		"self hit":      pkt(OpDamage, damageBody(8, 0x04, 8, 1000, 1, make([]byte, 8), 9)...),
-		"truncated":     pkt(OpDamage, damageBody(7, 0x05, 8, 1000, 1, make([]byte, 4), 9)...),
-		"empty":         pkt(OpDamage),
-		"switch > 255":  pkt(OpDamage, damageBody(7, 0x104, 8, 1000, 1, make([]byte, 8), 9)...),
+		"wrong opcode": pkt(0x3805, damageBody(7, 0x04, 8, 1000, 1, make([]byte, 8), 9)...),
+		"bad switch":   pkt(OpDamage, damageBody(7, 0x03, 8, 1000, 1, make([]byte, 8), 9)...),
+		"self hit":     pkt(OpDamage, damageBody(8, 0x04, 8, 1000, 1, make([]byte, 8), 9)...),
+		"truncated":    pkt(OpDamage, damageBody(7, 0x05, 8, 1000, 1, make([]byte, 4), 9)...),
+		"empty":        pkt(OpDamage),
+		"switch > 255": pkt(OpDamage, damageBody(7, 0x104, 8, 1000, 1, make([]byte, 8), 9)...),
 	}
 	for name, p := range cases {
 		if _, err := ParseDamage(p); err == nil {

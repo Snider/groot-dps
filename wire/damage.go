@@ -67,7 +67,7 @@ func ParseDamage(p []byte) (Damage, error) {
 		d.Back = dir&0x01 != 0
 		d.Front = dir&0x02 != 0
 	}
-	r.skip(8) // u32 + 4 bytes, unknown
+	r.skip(8)  // u32 + 4 bytes, unknown
 	r.varint() // unknown
 	d.Amount = r.varint()
 
