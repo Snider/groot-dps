@@ -6,7 +6,7 @@
 - Built on CoreGO (`~/Code/core`).
 
 ## Open questions
-- [ ] Is the traffic readable? Plaintext, compressed, or encrypted? Look at how the existing meters on GitHub decode it. If it's encrypted, decide whether that crosses the safety line.
+- [x] Traffic is plaintext TCP (some frames LZ4-compressed). See `protocol.md`.
 - [ ] Capture from Go on Windows: gopacket/pcap (cgo + Npcap SDK) vs a pure-Go Npcap binding. The game runs on Windows, so we need a Windows box or a `.pcap` someone captures for us to develop against.
 - [ ] What we show: per player, per fight, boss vs trash, skill breakdown.
 - [ ] Maybe: post a fight summary to the static's Discord via the Groot bot (a `g!` command, not a second bot).
