@@ -43,5 +43,6 @@
 - **Unknown fields stay named `unknown`.** They're documented in `plans/protocol.md`. When we work one out, update the notes and the tests together. Every new data point goes in the `plans/dps-meter.md` table.
 - **GPL-3 reference:** borrow concepts from Kuroukihime's meter and write our own code. Credit it in the README.
 - **Before committing:** `./check.sh` (gofmt, vet, tests, Windows build). `./check.sh fuzz` after touching a decoder.
-- **Open:** what licence do we ship under? Releases need checksums so the static can verify what they run.
+- **Licence: EUPL-1.2** (`LICENSE`).
+- **Open:** releases need checksums so the static can verify what they run.
 
