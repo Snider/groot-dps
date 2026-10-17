@@ -30,5 +30,6 @@
 
 ## This project
 - Goal: a DPS meter for Aion 2.
-- Starting code: from another directory Snider will point at (fill in here: `SOURCE: ...`).
+- Built on Snider's own Go native app framework (path: `SOURCE: ...`). No DPS code exists yet.
+- Why: the static wants a meter, and Snider building it means friends can trust what they run. So: open source, readable, no telemetry, nothing sneaky. Trust is the feature.
 - Ideas and next steps go in `plans/`.
