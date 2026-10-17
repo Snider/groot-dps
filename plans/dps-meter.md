@@ -12,8 +12,8 @@
 - [ ] Maybe: post a fight summary to the static's Discord via the Groot bot (a `g!` command, not a second bot).
 
 ## Plan
-1. Get a `.pcap` of a short fight from a static member (Npcap + Wireshark, filtered to the game's ports).
-2. TDD the decoder against that capture: packet → damage event.
+1. Get a `.pcapng` of a short fight (Snider: idle 10s, dummy 30s, kill + loot) into `testdata/` (git-ignored).
+2. ~~TDD the decoder~~ done on synthetic packets: `wire/` (framing, LZ4, damage), `tcp/` (reassembly), `cmd/grootdump`. **Next: verify against the real capture.**
 3. Aggregate: events → per-player DPS per fight (pure and fully tested).
 4. Thin live layer: Npcap capture → decoder → aggregator → CoreGO window.
 

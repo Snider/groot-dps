@@ -151,7 +151,7 @@ func printPacket(ts time.Time, f *flow, op uint16, p []byte, full bool) {
 	if !full && len(shown) > 32 {
 		shown = shown[:32]
 	}
-	fmt.Printf("%s +%7.3fs  %#06x %-12s %5dB  %s\n",
+	fmt.Printf("%s +%7.3fs  0x%04x %-12s %5dB  %s\n",
 		ts.Format("15:04:05.000"), ts.Sub(f.first).Seconds(), op, name, len(p), hex.EncodeToString(shown))
 }
 
@@ -197,7 +197,7 @@ func summary(flows map[string]*flow) {
 			if name == "" {
 				name = "?  (unknown — loot candidate?)"
 			}
-			fmt.Printf("  %#06x  %6d  %s\n", op, f.counts[op], name)
+			fmt.Printf("  0x%04x  %6d  %s\n", op, f.counts[op], name)
 		}
 	}
 }
