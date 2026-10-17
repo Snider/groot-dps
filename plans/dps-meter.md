@@ -22,4 +22,7 @@ Running list of what the packets give us, even if we don't use it yet. The aim i
 
 | Data point | Packet / opcode | Fields | Seen in | Notes |
 |---|---|---|---|---|
-| _(none yet)_ | | | | |
+| Kill | `0x8D04` entity death | entity id | Kuroukihime | anchor for drops (what died, where, when) |
+| Mob spawn | `0x3641` | mob id → name | Kuroukihime | boss vs trash, drop source |
+| Party | `0x9702` | members | Kuroukihime | tag drops per static run |
+| Loot | **unknown** | item, qty | — | ours to find: capture a kill + pickup |
