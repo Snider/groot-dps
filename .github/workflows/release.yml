@@ -1,0 +1,83 @@
+# Tag v* → test, build grootdps.exe on GitHub's Windows runner, attest it,
+# scan it on VirusTotal, publish a release with the checksums and the scan link.
+# Verify a download: gh attestation verify grootdps.exe -R Snider/groot-dps
+name: release
+on:
+  push:
+    tags: ["v*"]
+permissions:
+  contents: write     # create the release
+  id-token: write     # sign the attestation
+  attestations: write
+env:
+  # A2Tools' DoT allowlist (GPL-3), shipped beside the exe, pinned to the commit we read.
+  DOTS_URL: https://raw.githubusercontent.com/taengu/A2Tools-DPS-Meter/c55788c/src/data/dot_skill_ids.json
+jobs:
+  release:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: go.mod
+      - name: check
+        shell: bash
+        run: bash check.sh
+      - name: build
+        shell: bash
+        run: |
+          mkdir -p dist/grootdps
+          CGO_ENABLED=0 go build -trimpath -ldflags "-s -w -H windowsgui" -o dist/grootdps/grootdps.exe ./cmd/grootdps
+          curl -fsSL "$DOTS_URL" -o dist/grootdps/dot_skill_ids.json
+          cp LICENSE dist/grootdps/LICENSE.txt
+          cat > dist/grootdps/README.txt <<TXT
+          Groot DPS ${GITHUB_REF_NAME}: https://github.com/${GITHUB_REPOSITORY}
+          Needs Npcap (https://npcap.com). Run the game in borderless windowed mode.
+          grootdps.exe sends nothing anywhere: it only listens.
+
+          dot_skill_ids.json is A2Tools-DPS-Meter's DoT allowlist (GPL-3,
+          https://github.com/taengu/A2Tools-DPS-Meter at c55788c), shipped
+          alongside, unchanged. Groot DPS itself is EUPL-1.2 (LICENSE.txt).
+          TXT
+          cd dist && powershell -NoProfile -Command "Compress-Archive -Path grootdps -DestinationPath grootdps-${GITHUB_REF_NAME}-windows-amd64.zip"
+          cp grootdps/grootdps.exe .
+          sha256sum grootdps.exe grootdps-*.zip > SHA256SUMS
+          cat SHA256SUMS
+      - uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8 # v4.2.2
+        with:
+          subject-path: |
+            dist/grootdps.exe
+            dist/grootdps-*.zip
+      - name: virustotal
+        shell: bash
+        env:
+          VT_API_KEY: ${{ secrets.VT_API_KEY }}
+        run: |
+          sha=$(sha256sum dist/grootdps.exe | cut -d' ' -f1)
+          if [ -z "$VT_API_KEY" ]; then
+            echo "VT_LINE=VirusTotal: not scanned (no VT_API_KEY secret)." >> "$GITHUB_ENV"
+            exit 0
+          fi
+          curl -fsS --request POST https://www.virustotal.com/api/v3/files \
+            -H "x-apikey: $VT_API_KEY" -F "file=@dist/grootdps.exe" > /dev/null
+          echo "VT_LINE=VirusTotal scan of grootdps.exe: https://www.virustotal.com/gui/file/$sha" >> "$GITHUB_ENV"
+      - name: release
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          {
+            echo "Built on GitHub's Windows runner from ${GITHUB_SHA}, attested with build provenance."
+            echo
+            echo "- ${VT_LINE}"
+            echo "- Verify: \`gh attestation verify grootdps.exe -R ${GITHUB_REPOSITORY}\`"
+            echo
+            echo '```'
+            cat dist/SHA256SUMS
+            echo '```'
+            echo
+            echo "Unzip, install [Npcap](https://npcap.com), run grootdps.exe with the game in borderless windowed mode. It only listens: nothing is sent anywhere."
+          } > notes.md
+          pre=""; case "$GITHUB_REF_NAME" in v0.*) pre="--prerelease";; esac
+          gh release create "$GITHUB_REF_NAME" $pre --title "Groot DPS $GITHUB_REF_NAME" --notes-file notes.md \
+            dist/grootdps-*.zip dist/grootdps.exe dist/SHA256SUMS
