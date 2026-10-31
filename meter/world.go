@@ -44,3 +44,14 @@ func (m *Meter) Death(at int64, d wire.Death) {
 		}
 	}
 }
+
+// Kill: a 04 8D record names who got a kill (or owns a summon). It names them
+// unless the game already did, which is how your first kill names you.
+func (m *Meter) Kill(k wire.Kill) {
+	if m.names[k.Owner] == "" {
+		m.names[k.Owner] = k.Name
+	}
+	if s, ok := m.npcs[k.Entity]; ok && s.Kind == wire.KindSummon {
+		m.Link(k.Entity, k.Owner)
+	}
+}

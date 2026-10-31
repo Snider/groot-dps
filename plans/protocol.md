@@ -118,7 +118,11 @@ NPCs, summons/pets and skill effects, never real players. Golden spawns in `wire
 ## Death (`42 36`)
 `entity` varint, varint (always 0), `flag` varint: 1 = already dead when the zone loaded, 3 = killed, 7 = gone from the world (only trust 7 under `42 36`). The game doesn't count a spirit's ticks after it's gone; a direct hit means the id is back.
 
-(Kuroukihime's `0x8D04` "death" is really A2Tools' kill/ownership record: `04 8D <mob> <4 bytes> <owner> <server> <name> <server name>`. It names who got the kill, so it matters for the drop DB.)
+## Kill / ownership (`04 8D`)
+`entity` varint, 4 unknown bytes, `owner` varint, `server` u16, `len` u8 + name, `len` u8 + server name, then more unknown. Golden record in `wire/spawn_golden_test.go`.
+- After a kill: `owner` got the kill of `entity`. It names them, so your first kill names you (no zone load needed). Identity records still win over it.
+- About a summon: `owner` owns `entity`.
+- (Kuroukihime called `0x8D04` "death"; deaths are `42 36`.) Kills plus loot are what the drop DB needs: loot is still unknown.
 
 ## From A2Tools' plugin decoders
 Plugins (github.com/taengu/A2Tools-Plugins, GPL-3, read at `24aaf21`, cloned in `ref/`) declare the frames they want in `manifest.json`: opcode bytes as on the wire, then fields in order (numbers only, `skip:N` = unknown bytes). `self=x` means the meter only passes it on when field `x` is your own character. **Unverified by us**: plugin authors' readings, not golden-tested. Promote a row to a decoder only with a real record.

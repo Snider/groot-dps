@@ -67,3 +67,11 @@ func FuzzParseSpawn(f *testing.F) {
 		ParseDeath(data)
 	})
 }
+
+func FuzzParseKill(f *testing.F) {
+	f.Add(frame([]byte{0x04, 0x8d, 0xec, 0xde, 0x02, 0x72, 0x28, 0xe9, 0x00, 0xae, 0x0b, 0x19, 0x05, 0x02, 'A', 'b'}))
+	f.Fuzz(func(t *testing.T, data []byte) {
+		ParseKill(data)
+		PartyLeft(data)
+	})
+}

@@ -154,6 +154,10 @@ func Dispatch(m *meter.Meter, at int64, p []byte) {
 		if sp, err := wire.ParseSpawn(p); err == nil {
 			m.Spawn(sp)
 		}
+	case wire.OpKill:
+		if k, err := wire.ParseKill(p); err == nil {
+			m.Kill(k)
+		}
 	case wire.OpDeath:
 		if d, err := wire.ParseDeath(p); err == nil {
 			m.Death(at, d)

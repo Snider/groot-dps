@@ -21,7 +21,7 @@ Some meters only learn which character is yours when you load a zone, so you tel
 - **Your own stats** (`4A 36`): use a potion, scroll, buff or skill that changes your stats, or swap gear, and three of these records in a row point to you.
 - **Your own updates** (`06 38`): sent about you several times a second while you play. Within a few seconds the meter picks the one player they name far more than anyone else.
 
-You show up marked as you straight away. Your name fills in at the next zone load, when the game sends your full character record. (These rules come from A2Tools' captures. We'll verify them on our own once the live meter runs.)
+You show up marked as you straight away. Your name fills in with your first kill (the kill record names whoever got it), or at the next zone load, whichever comes first. (These rules come from A2Tools' captures. We'll verify them on our own once the live meter runs.)
 
 ## Status
 The decoders and the maths are done and tested against real game records: damage, DoT/heal ticks, names, party, spawns (bosses spot themselves by their stagger gauge, pets find their owners) and deaths. The window (`cmd/grootdps`, Wails v3) runs on Windows from Npcap, or anywhere from a capture file. Not yet tried against the live game.

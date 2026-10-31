@@ -102,3 +102,35 @@ func TestBossFightsListFirst(t *testing.T) {
 		t.Fatalf("first %d", f[0].Target)
 	}
 }
+
+// Your first kill names you, even when only your own stats said which entity you are.
+func TestYourFirstKillNamesYou(t *testing.T) {
+	m := New(nil)
+	for range 3 {
+		m.SelfStats(groot)
+	}
+	m.Add(hit(0, groot, monster, 12_020_100, 10))
+	if r := m.Rows(monster)[0]; r.Name != "" || !r.Self {
+		t.Fatalf("before: %+v", r)
+	}
+	m.Kill(wire.Kill{Entity: monster, Owner: groot, Server: 1301, Name: "Groot"})
+	if r := m.Rows(monster)[0]; r.Name != "Groot" {
+		t.Fatalf("after: %+v", r)
+	}
+	// A name the game stated in an identity record stays.
+	m.Identify(wire.Identity{Entity: cleric, Name: "Pinky"})
+	m.Kill(wire.Kill{Entity: monster, Owner: cleric, Server: 1301, Name: "Imposter"})
+	if m.Name(cleric) != "Pinky" {
+		t.Fatalf("overrode: %s", m.Name(cleric))
+	}
+}
+
+// The same record about a summon is its owner.
+func TestAKillRecordLinksASummon(t *testing.T) {
+	m := New(nil)
+	m.Spawn(wire.Spawn{Entity: spirit, Kind: wire.KindSummon})
+	m.Kill(wire.Kill{Entity: spirit, Owner: cleric, Server: 1301, Name: "Pinky"})
+	if m.Owner(spirit) != cleric {
+		t.Fatal("not linked")
+	}
+}

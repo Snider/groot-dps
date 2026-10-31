@@ -192,3 +192,51 @@ func ParseDeath(p []byte) (Death, error) {
 	}
 	return d, nil
 }
+
+// Kill is a 04 8D record: who got a kill (or owns a summon). It names them,
+// so your first kill names you without a zone load.
+type Kill struct {
+	Entity uint32 // what died (or the summon)
+	Owner  uint32 // who killed it (or owns it)
+	Server uint16
+	Name   string
+}
+
+var ErrNotKill = errors.New("kill: not a kill record")
+
+// ParseKill reads <entity varint> <4 bytes> <owner varint> <server u16>
+// <len u8> <name> [<len u8> <server name> ...].
+func ParseKill(p []byte) (Kill, error) {
+	if op, ok := Opcode(p); !ok || op != OpKill {
+		return Kill{}, ErrNotKill
+	}
+	_, n := uvarint(p)
+	r := reader{b: p[n+2:]}
+	var k Kill
+	k.Entity = r.varint32()
+	r.skip(4)
+	k.Owner = r.varint32()
+	k.Server = r.u16()
+	if r.err != nil || k.Entity < 100 || k.Owner < 100 || k.Entity == k.Owner {
+		return Kill{}, ErrNotKill
+	}
+	if name, _, ok := lenName(r.b); ok {
+		k.Name = name
+	}
+	if k.Name == "" || k.Server < 1000 || k.Server > 9_999 {
+		return Kill{}, ErrNotKill
+	}
+	return k, nil
+}
+
+// lenName: <len u8> <utf8 name>, the whole field a name.
+func lenName(b []byte) (string, int, bool) {
+	if len(b) < 1 {
+		return "", 0, false
+	}
+	k := int(b[0])
+	if k < 1 || k > 48 || 1+k > len(b) || !exactName(string(b[1:1+k])) {
+		return "", 0, false
+	}
+	return string(b[1 : 1+k]), 1 + k, true
+}

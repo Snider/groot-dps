@@ -91,3 +91,16 @@ func TestPartyLeft(t *testing.T) {
 		}
 	}
 }
+
+// A Sorcerer on Ventus (1305) killing a mob (A2Tools, 2026-10-01; name scrubbed).
+func TestGoldenKill(t *testing.T) {
+	k, err := ParseKill(frameOf(t, "048decde027228e900ae0b1905054f616b6c790656656e74757301000000"))
+	want := Kill{Entity: 0x6c | 0x5e<<7 | 2<<14, Owner: 1454, Server: 1305, Name: "Oakly"}
+	if err != nil || k != want {
+		t.Fatalf("got %+v, %v", k, err)
+	}
+	// A name that runs into the next field is not one.
+	if k, err := ParseKill(frameOf(t, "048decde027228e900ae0b1905074f616b6c790656656e74757301000000")); err == nil {
+		t.Fatalf("garbled: %+v", k)
+	}
+}

@@ -11,7 +11,7 @@ go vet ./...
 go test ./...
 GOOS=windows GOARCH=amd64 CGO_ENABLED=0 go build ./...  # several packages: output discarded
 if [ "$1" = fuzz ]; then
-  for t in FuzzSplitter FuzzUnpack FuzzParseDamage FuzzParseTick FuzzParseIdentity FuzzParseRoster FuzzParseSpawn; do go test ./wire -run '^$' -fuzz="^$t\$" -fuzztime=15s; done
+  for t in FuzzSplitter FuzzUnpack FuzzParseDamage FuzzParseTick FuzzParseIdentity FuzzParseRoster FuzzParseSpawn FuzzParseKill; do go test ./wire -run '^$' -fuzz="^$t\$" -fuzztime=15s; done
   go test ./tcp -run '^$' -fuzz='^FuzzStream$' -fuzztime=15s
 fi
 echo "all good 🌳"
