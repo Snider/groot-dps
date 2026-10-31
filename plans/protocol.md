@@ -11,7 +11,10 @@ We borrow the protocol knowledge only and write our own Go. No code copied.
 ## Framing
 - Each packet: `varint length` then the body. **Packet size = varint value + varint byte length − 4.**
 - varint = LEB128 (7 bits per byte, little-endian, high bit means more bytes follow).
-- Sync pattern `0E 00 36` = an 11-byte keepalive/heartbeat. Use it to find the first packet boundary mid-stream, then skip it. On a nonsense length (≤0 or >40 KB), drop 1 byte and re-sync.
+- Sync pattern `0E 00 36` = an 11-byte keepalive/heartbeat. Use it to find the first packet boundary mid-stream, then skip it. On a nonsense length (≤0 or >64 KB), drop 1 byte and re-sync.
+- `00` bytes between frames are padding: skip them (they used to knock us out of sync until the next keepalive).
+- TLS records (`14`-`17`, `03 01`-`03 04`, u16 BE length) turn up on the same port from a second connection. Skip them whole. Read as frames they invent packets out of ciphertext; A2Tools saw kills 20-35% short of boss HP until they did. None of 538,000 game frames starts like one.
+- A length over 16 KB that's still arriving is garbage, not a fragment worth waiting for, unless the frame starts with a bundle header (`FF FF` + size ≤ 1 MB). Zone-load bundles run to 17 KB+ and carry your own player record.
 - Opcode = 2 bytes after the length varint, read as u16 LE (bytes `04 38` → `0x3804`).
 
 ## Compression
