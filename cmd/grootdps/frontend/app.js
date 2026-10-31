@@ -87,6 +87,10 @@ $('reset').addEventListener('click', async () => {
   await fetch('/api/reset', { method: 'POST' });
   tick();
 });
+$('history').addEventListener('click', async () => {
+  const res = await fetch('/api/history', { method: 'POST' });
+  if (!res.ok) $('status').textContent = 'Saving fights is off (-keep-days 0).';
+});
 $('close').addEventListener('click', () => window.wails?.Window?.Close());
 
 setInterval(tick, 500);

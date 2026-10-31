@@ -14,8 +14,9 @@ import (
 )
 
 const (
-	maxFlows   = 64
-	pruneEvery = 30 * time.Second
+	maxFlows    = 64
+	pruneEvery  = 30 * time.Second
+	finishEvery = 2 * time.Second
 )
 
 type flow struct {
@@ -31,10 +32,22 @@ type Pipeline struct {
 	flows   map[string]*flow
 	packets int
 	pruned  time.Time
+
+	// OnFinished, if set, gets each fight you were in once it's over (killed,
+	// or quiet for 30s) and long enough to count. Called with the lock held:
+	// don't call back into the pipeline.
+	OnFinished func(at time.Time, v FightView)
+	checked    time.Time
+	handedOver map[fightKey]bool
+}
+
+type fightKey struct {
+	target uint32
+	start  int64
 }
 
 func New(dotSkills map[uint32]bool) *Pipeline {
-	return &Pipeline{m: meter.New(dotSkills), flows: map[string]*flow{}}
+	return &Pipeline{m: meter.New(dotSkills), flows: map[string]*flow{}, handedOver: map[fightKey]bool{}}
 }
 
 // Segment takes one server → client TCP segment. flow names the connection
@@ -61,6 +74,10 @@ func (p *Pipeline) Segment(at time.Time, flowKey string, seq uint32, payload []b
 			Dispatch(p.m, at.UnixMilli(), pk)
 		}
 	}
+	if p.OnFinished != nil && at.Sub(p.checked) >= finishEvery {
+		p.handOver(at)
+		p.checked = at
+	}
 	if at.Sub(p.pruned) >= pruneEvery {
 		p.m.Prune(at.UnixMilli())
 		p.pruned = at
@@ -76,6 +93,26 @@ func (p *Pipeline) dropOldest() {
 		}
 	}
 	delete(p.flows, oldest)
+}
+
+// handOver passes on fights that just finished, before Prune can drop them.
+func (p *Pipeline) handOver(at time.Time) {
+	now := at.UnixMilli()
+	live := map[fightKey]bool{}
+	for _, f := range p.m.Fights() {
+		k := fightKey{f.Target, f.Start}
+		live[k] = true
+		over := f.Killed || f.End < now-meter.IdleResetMS
+		if over && !p.handedOver[k] && p.m.Ours(f) {
+			p.handedOver[k] = true
+			p.OnFinished(at, view(p.m, f))
+		}
+	}
+	for k := range p.handedOver {
+		if !live[k] {
+			delete(p.handedOver, k)
+		}
+	}
 }
 
 // Dispatch hands one game packet to the meter, by opcode.
@@ -132,4 +169,21 @@ func (p *Pipeline) With(fn func(*meter.Meter)) {
 	p.mu.Lock()
 	defer p.mu.Unlock()
 	fn(p.m)
+}
+
+// Flush hands over every fight of yours long enough to count that hasn't
+// been yet, finished or not (for closing the meter mid-fight).
+func (p *Pipeline) Flush(at time.Time) {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	if p.OnFinished == nil {
+		return
+	}
+	for _, f := range p.m.Fights() {
+		k := fightKey{f.Target, f.Start}
+		if !p.handedOver[k] && p.m.Ours(f) {
+			p.handedOver[k] = true
+			p.OnFinished(at, view(p.m, f))
+		}
+	}
 }

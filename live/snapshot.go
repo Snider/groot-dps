@@ -43,14 +43,18 @@ func (p *Pipeline) Snapshot() Snapshot {
 	p.mu.Lock()
 	defer p.mu.Unlock()
 	s := Snapshot{You: p.m.Me() != 0, Packets: p.packets}
-	f := p.m.Current()
-	if f == nil {
-		return s
+	if f := p.m.Current(); f != nil {
+		v := view(p.m, f)
+		s.Fight = &v
 	}
-	v := &FightView{Target: f.Target, NPC: f.NPC, Boss: f.Boss, Killed: f.Killed, MaxHP: f.MaxHP,
+	return s
+}
+
+func view(m *meter.Meter, f *meter.Fight) FightView {
+	v := FightView{Target: f.Target, NPC: f.NPC, Boss: f.Boss, Killed: f.Killed, MaxHP: f.MaxHP,
 		Seconds: float64(f.Duration()) / 1000, Total: f.Total}
-	for _, r := range p.m.Rows(f.Target) {
-		name := label(p.m, r.Actor)
+	for _, r := range m.Rows(f.Target) {
+		name := label(m, r.Actor)
 		var crit float64
 		if r.Hits > 0 {
 			crit = float64(r.Crits) / float64(r.Hits) * 100
@@ -58,11 +62,10 @@ func (p *Pipeline) Snapshot() Snapshot {
 		v.Rows = append(v.Rows, RowView{Name: name, Class: r.Class.String(), Amount: r.Amount, PerSec: r.DPS,
 			Share: r.Share, CritRate: crit, Deaths: r.Deaths, Self: r.Self, Party: r.InParty})
 	}
-	for _, h := range p.m.HealRows(f.Target) {
-		v.Heals = append(v.Heals, RowView{Name: label(p.m, h.Actor), Self: h.Actor == p.m.Me(), Amount: h.Amount, PerSec: h.PerSecond})
+	for _, h := range m.HealRows(f.Target) {
+		v.Heals = append(v.Heals, RowView{Name: label(m, h.Actor), Self: h.Actor == m.Me(), Amount: h.Amount, PerSec: h.PerSecond})
 	}
-	s.Fight = v
-	return s
+	return v
 }
 
 func label(m *meter.Meter, id uint32) string {

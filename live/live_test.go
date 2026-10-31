@@ -118,3 +118,61 @@ func TestLongSessionsArePruned(t *testing.T) {
 		}
 	})
 }
+
+// A fight you were in is handed over once when it ends: killed, or gone quiet.
+func TestFinishedFightsAreHandedOverOnce(t *testing.T) {
+	self := frame(t, "3336ed745e91c128370647726f6f747918051e000000011c0000007f0100007f0100001c000000d002040000000000")
+	var got []FightView
+	p := New(nil)
+	p.OnFinished = func(_ time.Time, v FightView) { got = append(got, v) }
+	t0 := time.UnixMilli(0)
+	seq := uint32(1)
+	push := func(at time.Duration, b []byte) {
+		p.Segment(t0.Add(at), "game", seq, b)
+		seq += uint32(len(b))
+	}
+	push(0, append(append([]byte{}, keepalive...), self...))
+	push(0, hitRec(50001, grooty, 17_050_240, 100))
+	push(10*time.Second, hitRec(50001, grooty, 17_050_240, 100))
+	push(12*time.Second, frame(t, "4236d18603"+"0003"))        // 50001 killed
+	push(13*time.Second, hitRec(50002, 9999, 11_020_100, 100)) // a stranger's fight
+	push(20*time.Second, hitRec(50002, 9999, 11_020_100, 100))
+	push(90*time.Second, keepalive)
+	if len(got) != 1 || got[0].Target != 50001 || !got[0].Killed || got[0].Total != 200 {
+		t.Fatalf("got %+v", got)
+	}
+	push(200*time.Second, keepalive)
+	if len(got) != 1 {
+		t.Fatalf("handed over again: %d", len(got))
+	}
+}
+
+// Too short to count: not kept.
+func TestBlipsArentHandedOver(t *testing.T) {
+	self := frame(t, "3336ed745e91c128370647726f6f747918051e000000011c0000007f0100007f0100001c000000d002040000000000")
+	n := 0
+	p := New(nil)
+	p.OnFinished = func(time.Time, FightView) { n++ }
+	b := append(append(append([]byte{}, keepalive...), self...), hitRec(50001, grooty, 17_050_240, 100)...)
+	p.Segment(time.UnixMilli(0), "game", 1, b)
+	p.Segment(time.UnixMilli(120_000), "game", 1+uint32(len(b)), keepalive)
+	if n != 0 {
+		t.Fatalf("%d handed over", n)
+	}
+}
+
+func TestFlushHandsOverAFightInProgress(t *testing.T) {
+	self := frame(t, "3336ed745e91c128370647726f6f747918051e000000011c0000007f0100007f0100001c000000d002040000000000")
+	n := 0
+	p := New(nil)
+	p.OnFinished = func(time.Time, FightView) { n++ }
+	b := append(append(append([]byte{}, keepalive...), self...), hitRec(50001, grooty, 17_050_240, 100)...)
+	p.Segment(time.UnixMilli(0), "game", 1, b)
+	b2 := hitRec(50001, grooty, 17_050_240, 100)
+	p.Segment(time.UnixMilli(8000), "game", 1+uint32(len(b)), b2)
+	p.Flush(time.UnixMilli(9000))
+	p.Flush(time.UnixMilli(9500))
+	if n != 1 {
+		t.Fatalf("%d handed over", n)
+	}
+}

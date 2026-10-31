@@ -17,15 +17,18 @@ import (
 	"embed"
 	"encoding/json"
 	"flag"
+	"fmt"
 	"log"
 	"net/http"
 	"os"
 	"path/filepath"
 	"sync"
+	"time"
 
 	"github.com/wailsapp/wails/v3/pkg/application"
 
 	"groot/dps/capture"
+	"groot/dps/history"
 	"groot/dps/live"
 )
 
@@ -36,6 +39,8 @@ func main() {
 	replay := flag.String("replay", "", "play a .pcapng/.pcap instead of capturing live")
 	fast := flag.Bool("fast", false, "with -replay: as fast as it reads, not at the capture's pace")
 	dotsFile := flag.String("dots", "", "JSON list of DoT skill ids whose damage ticks count")
+	keepDays := flag.Int("keep-days", 30, "keep finished fights on disk this many days (0: don't save them)")
+	historyDir := flag.String("history", defaultHistory(), "where finished fights are saved")
 	x := flag.Int("x", 40, "window position, from the screen's left")
 	y := flag.Int("y", 120, "window position, from the screen's top")
 	flag.Parse()
@@ -43,10 +48,24 @@ func main() {
 	pipe := live.New(loadDots(*dotsFile))
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
+	store := history.Store{}
+	if *keepDays > 0 {
+		store.Dir = *historyDir
+		queue := make(chan record, 64)
+		pipe.OnFinished = func(at time.Time, v live.FightView) { // before capture starts: no race
+			select {
+			case queue <- record{at, v}:
+			default:
+				log.Printf("history: queue full, a fight wasn't saved")
+			}
+		}
+		go keepHistory(ctx, queue, store, *keepDays)
+	}
 	go func() {
 		var err error
 		if *replay != "" {
 			err = capture.Replay(ctx, *replay, !*fast, pipe.Segment)
+			pipe.Flush(time.Now()) // the file's over: so are its fights
 			log.Printf("replay finished: %d packets", pipe.Snapshot().Packets)
 		} else {
 			err = capture.Live(ctx, pipe.Segment, log.Printf)
@@ -59,7 +78,7 @@ func main() {
 	app := application.New(application.Options{
 		Name:        "Groot DPS",
 		Description: "A DPS meter for Aion 2 that only listens",
-		Assets:      application.AssetOptions{Handler: api(pipe, frontend)},
+		Assets:      application.AssetOptions{Handler: api(pipe, store, frontend)},
 		Mac:         application.MacOptions{ApplicationShouldTerminateAfterLastWindowClosed: true},
 		Windows:     application.WindowsOptions{},
 	})
@@ -78,13 +97,17 @@ func main() {
 		Y:               *y,
 		URL:             "/",
 	})
-	if err := app.Run(); err != nil {
+	err := app.Run()
+	pipe.Flush(time.Now())             // a fight still going when the window closed
+	time.Sleep(200 * time.Millisecond) // let the writer finish it
+	if err != nil {
 		log.Fatal(err)
 	}
 }
 
-// api serves the window's files plus /api/meter (a snapshot) and /api/reset.
-func api(pipe *live.Pipeline, files embed.FS) http.Handler {
+// api serves the window's files plus /api/meter (a snapshot), /api/reset and
+// /api/history (opens the fights folder).
+func api(pipe *live.Pipeline, store history.Store, files embed.FS) http.Handler {
 	mux := http.NewServeMux()
 	var connected sync.Once
 	mux.HandleFunc("GET /api/meter", func(w http.ResponseWriter, r *http.Request) {
@@ -94,6 +117,18 @@ func api(pipe *live.Pipeline, files embed.FS) http.Handler {
 	})
 	mux.HandleFunc("POST /api/reset", func(w http.ResponseWriter, r *http.Request) {
 		pipe.Reset()
+		w.WriteHeader(http.StatusNoContent)
+	})
+	mux.HandleFunc("POST /api/history", func(w http.ResponseWriter, r *http.Request) {
+		if store.Dir == "" {
+			http.Error(w, "history is off", http.StatusNotFound)
+			return
+		}
+		os.MkdirAll(store.Dir, 0o755)
+		if err := application.Get().Browser.OpenFile(store.Dir); err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
 		w.WriteHeader(http.StatusNoContent)
 	})
 	mux.Handle("/", application.BundledAssetFileServer(mustSub(files, "frontend")))
@@ -127,4 +162,67 @@ func loadDots(path string) map[uint32]bool {
 		dots[id] = true
 	}
 	return dots
+}
+
+// defaultHistory: %AppData%\GrootDPS\fights on Windows (the OS's per-user config folder elsewhere).
+func defaultHistory() string {
+	dir, err := os.UserConfigDir()
+	if err != nil {
+		return ""
+	}
+	return filepath.Join(dir, "GrootDPS", "fights")
+}
+
+// record is what a saved fight file holds.
+type record struct {
+	At    time.Time      `json:"at"`
+	Fight live.FightView `json:"fight"`
+}
+
+func (r record) label() string {
+	label := fmt.Sprintf("fight %d", r.Fight.NPC)
+	if r.Fight.Boss {
+		label = fmt.Sprintf("boss %d", r.Fight.NPC)
+	}
+	if r.Fight.Killed {
+		label += " killed"
+	}
+	return label
+}
+
+// keepHistory saves finished fights (off the capture path, through a queue)
+// and clears out old days at start and once a day.
+func keepHistory(ctx context.Context, queue <-chan record, store history.Store, keepDays int) {
+	save := func(r record) {
+		if _, err := store.Save(r.At, r.label(), r); err != nil {
+			log.Printf("history: %v", err)
+		}
+	}
+	clean := func() {
+		if n, err := store.Cleanup(time.Now(), keepDays); err != nil {
+			log.Printf("history cleanup: %v", err)
+		} else if n > 0 {
+			log.Printf("history: cleared %d old days", n)
+		}
+	}
+	clean()
+	daily := time.NewTicker(24 * time.Hour)
+	defer daily.Stop()
+	for {
+		select {
+		case r := <-queue:
+			save(r)
+		case <-daily.C:
+			clean()
+		case <-ctx.Done():
+			for { // drain what's queued, then stop
+				select {
+				case r := <-queue:
+					save(r)
+				default:
+					return
+				}
+			}
+		}
+	}
 }

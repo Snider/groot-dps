@@ -10,6 +10,11 @@ Because a meter sees everything you and everyone around you do, and you should b
 - **Open source, and small enough to read.** EUPL-1.2. You can check every line and build it yourself instead of trusting a download. Releases will come with checksums so you can check what you run.
 - **Passive only.** It reads a copy of the game's network traffic (Npcap) and never touches the game client: no memory reads, no hooks, no injection, nothing sent to the game.
 
+## Your fights, on your disk
+When a fight you were in ends (killed, or quiet for 30s), the meter saves what it showed as a JSON file in your own folder: `%AppData%\GrootDPS\fights\<day>\<time> boss <npc> killed.json`. 📁 in the window opens it. Days older than 30 are deleted on their own.
+
+It's yours: read it, keep it, delete it. Nothing reads it but you. `-keep-days 7` keeps a week, `-keep-days 0` saves nothing, and `-history <folder>` puts it somewhere else.
+
 ## No teleport needed
 Some meters only learn which character is yours when you load a zone, so you teleport around the open world before your row shows up. This one also listens for things the server only sends about you:
 
@@ -39,7 +44,8 @@ The window reads the meter through the app's own asset server, inside the proces
 - `wire/`: game stream → packets (framing, LZ4 bundles) and decoders (damage, ticks, identities, party roster)
 - `tcp/`: puts TCP segments back in order
 - `meter/`: hits → fights → DPS rows, names, your party, which entity is you (pure, no IO)
-- `live/`: TCP segments → frames → meter, and the snapshot the window shows
+- `live/`: TCP segments → frames → meter, the snapshot the window shows, finished fights
+- `history/`: finished fights saved on your disk, one file each, old days cleared
 - `capture/`: capture files, and live Npcap on every adapter (read-only, server → client)
 - `cmd/grootdps`: the meter window (Wails v3, plain HTML/JS, no npm)
 - `cmd/fakefight`: writes a made-up fight capture for working on the window
