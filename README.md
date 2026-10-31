@@ -17,7 +17,7 @@ go run ./cmd/grootdump -op 0x3804 -hex testdata/fight.pcapng
 ```
 Captures go in `testdata/` and are git-ignored, because they contain character names.
 
-Protocol knowledge comes from [Kuroukihime/aion2-dps-meter](https://github.com/Kuroukihime/aion2-dps-meter) (GPL-3). The concepts are borrowed and the code is our own.
+Protocol knowledge comes from [A2Tools-DPS-Meter](https://github.com/taengu/A2Tools-DPS-Meter) (GPL-3), whose real-packet test records are our golden tests, and before that [Kuroukihime/aion2-dps-meter](https://github.com/Kuroukihime/aion2-dps-meter) (GPL-3). The facts are borrowed and the code is our own.
 
 ## Licence
 [EUPL-1.2](LICENSE). It's copyleft: if you change it and share it, you share the source too. It's GPL-3 compatible.

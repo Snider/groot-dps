@@ -41,7 +41,7 @@
 - **Synthetic tests prove our reading, not the game.** Tests built from our own packets only show we match our notes. Every decoder also needs a **golden test**: a real packet from a capture, saved as hex, with the expected decode.
 - **Captures are private.** They contain names. `.pcap`/`.pcapng` stay out of git. Golden packets get trimmed to the one packet and names scrubbed before they're committed.
 - **Unknown fields stay named `unknown`.** They're documented in `plans/protocol.md`. When we work one out, update the notes and the tests together. Every new data point goes in the `plans/dps-meter.md` table.
-- **GPL-3 reference:** borrow concepts from Kuroukihime's meter and write our own code. Credit it in the README.
+- **Source of truth: A2Tools** (github.com/taengu/A2Tools-DPS-Meter, Rust/Tauri, GPL-3), cloned into `ref/` (git-ignored; `git -C ref/A2Tools-DPS-Meter pull` to update). It's mature and its tests use real records checked against the game's Damage Analyzer. TDD loop: lift a real record and its expected values from their tests into our golden tests, then write our own Go to pass them. Port facts and test vectors, not code. Note the commit we read at. Credit in the README. Kuroukihime's meter was the first reference; where they disagree, A2Tools wins.
 - **Before committing:** `./check.sh` (gofmt, vet, tests, Windows build). `./check.sh fuzz` after touching a decoder.
 - **Licence: EUPL-1.2** (`LICENSE`).
 - **Open:** releases need checksums so the static can verify what they run.

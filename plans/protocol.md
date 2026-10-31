@@ -39,22 +39,27 @@ We borrow the protocol knowledge only and write our own Go. No code copied.
 | `0x8D04` | Entity death | fight end, **kill events → drop DB** |
 
 ## Damage packet (`0x3804`)
-After length + opcode:
-1. `targetId` varint
-2. `switch` varint: low nibble must be 4–7, else invalid
-3. unknown varint
-4. `actorId` varint (reject if equal to target)
-5. `skillCode` u32 LE
-6. unknown u8
-7. `damageType` varint (3 = crit)
-8. special block:
-   - switch == 4: no flag bytes, needs ≥8 remaining
-   - else: `flags` u8 (1 back, 2 parry, 4 perfect, 8 double), unknown u8, `direction` u8 (1 back, 2 front); needs ≥12 remaining
-   - then u32 unknown + 4 unknown bytes
-9. unknown varint
-10. `damage` varint (use 64-bit)
+Source of truth: A2Tools (`src-tauri/src/capture/stream_processor.rs`, `parsing_damage_inner`), checked against the game's own Damage Analyzer. Golden records in `wire/damage_golden_test.go`. All varints are at most 5 bytes and never past int32.
 
-The class comes from the skill code via a skill table. Healing skills and theostones (procs) are handled separately. We'll need that skill table data too.
+After length + opcode:
+1. `target` varint
+2. `switch` varint. Low nibble = layout: 4-7 has a value, 0 or 2 is a miss/resist with none (stop after the hit type). Bit `0x02` = plotter present, `0x01` = 4 more unknown bytes (layouts 5/7, **no real record checked yet**). `0x20` = extra hits in the tail, `0x40` = absorbed by a shield.
+3. unknown varint
+4. `actor` varint (reject if equal to target)
+5. `skill` u32 LE, valid 1..299,999,999. 7 digits = an NPC's skill (monster hitting a player = damage taken). 3,000,000-3,099,999 are theostone item ids (A2Tools maps them to `id*10+1`).
+6. `uid` u8: the same for every record of one cast
+7. `hitType` varint: 3 crit, 1 miss, 6 resist
+8. plotter (layouts 6/7): `flags` u8, `restoredHP` varint, `angle` u8 (1 back, 2 front, 0 untagged). Flags: 0x01 shield block, 0x02 parry, 0x04 perfect, 0x08 double (HardHit), 0x10 iron wall, 0x20 regeneration, 0x40 perfect block.
+9. 4 unknown bytes (layouts 5/7)
+10. 8 unknown bytes (looks like u32 + u32 count)
+11. `scalar` varint: the actor's damage multiplier in hundredths of a % (mobs 10000, geared players 16000-22000, moves with buffs). A summon carries its owner's, which is how A2Tools ties orphan summons to players. A `0` before it is a pad: skip it.
+12. `amount` varint. **It includes the extra hits.**
+13. tail, trusted only if it ends cleanly (end of packet, `0n 00` with n 1-7, or `04 38`):
+    - layout 4: an unknown varint 1-25 (a spirit's layout-4 record leaves it out, so retry as layout 6)
+    - `0x20`: count 1-25, then that many hit values (sum < amount)
+    - `0x40`: count 1-8, then that many u32 shield effect ids
+
+Not ported yet: chained records (`01 00` then another record), the `03 00` heal suffix, A2Tools' fallback tail heuristics, and their compact skill `99745942`.
 
 ## Not covered by the reference
 - **Loot / item drops: no opcode known.** That one is ours to find. Capture with a kill and a loot pickup in it, then diff.

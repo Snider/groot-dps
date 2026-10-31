@@ -5,49 +5,45 @@ import (
 	"testing"
 )
 
-func damageBody(target, sw, actor uint64, skill uint32, dmgType uint64, special []byte, damage uint64) []byte {
+// damageBody builds a record in the layout the golden records show: plotter
+// (layouts 6/7, given in special), 8 unknown bytes, scalar, value.
+func damageBody(target, sw, actor uint64, skill uint32, hitType uint64, special []byte, damage uint64) []byte {
 	return cat(
 		uv(target), uv(sw), uv(0), uv(actor),
-		binary.LittleEndian.AppendUint32(nil, skill), []byte{0},
-		uv(dmgType), special, uv(0), uv(damage),
+		binary.LittleEndian.AppendUint32(nil, skill), []byte{0x5d},
+		uv(hitType), special, make([]byte, 8), uv(10000), uv(damage),
 	)
 }
 
-func TestParseDamageWithFlags(t *testing.T) {
-	// flag byte 0x01 (back) is overridden by the direction byte, as in the reference meter.
-	special := cat([]byte{0x01 | 0x04 | 0x08, 0x00, 0x01}, make([]byte, 8)) // perfect+double, direction back
-	p := pkt(OpDamage, damageBody(500, 0x05, 42, 11020100, 3, special, 123456789012)...)
-
-	d, err := ParseDamage(p)
+func TestParseDamageSynthetic(t *testing.T) {
+	d, err := ParseDamage(pkt(OpDamage, damageBody(500, 0x06, 42, 11020100, 3, []byte{FlagPerfect | FlagDouble, 0, AngleBack}, 123456)...))
 	if err != nil {
 		t.Fatal(err)
 	}
-	want := Damage{Target: 500, Actor: 42, Skill: 11020100, Type: 3, Amount: 123456789012,
-		Crit: true, Back: true, Perfect: true, Double: true}
-	if d != want {
-		t.Fatalf("got  %+v\nwant %+v", d, want)
+	if d.Target != 500 || d.Actor != 42 || d.Skill != 11020100 || d.Amount != 123456 || d.Scalar != 10000 ||
+		!d.Crit() || !d.Perfect() || !d.Double() || !d.Back() || d.Parry() {
+		t.Fatalf("got %+v", d)
 	}
 }
 
-func TestParseDamageSwitchFourHasNoFlagBytes(t *testing.T) {
-	p := pkt(OpDamage, damageBody(7, 0x04, 8, 1000, 1, make([]byte, 8), 999)...)
-	d, err := ParseDamage(p)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if d.Amount != 999 || d.Crit || d.Back {
-		t.Fatalf("got %+v", d)
+// A tail that doesn't end cleanly is left alone: the amount still stands.
+func TestParseDamageMessyTailKeepsAmount(t *testing.T) {
+	d, err := ParseDamage(pkt(OpDamage, cat(damageBody(7, 0x24, 8, 1000, 2, nil, 999), []byte{0x63, 0x63})...))
+	if err != nil || d.Amount != 999 || d.Extra != nil {
+		t.Fatalf("got %+v, %v", d, err)
 	}
 }
 
 func TestParseDamageRejects(t *testing.T) {
 	cases := map[string][]byte{
-		"wrong opcode": pkt(0x3805, damageBody(7, 0x04, 8, 1000, 1, make([]byte, 8), 9)...),
-		"bad switch":   pkt(OpDamage, damageBody(7, 0x03, 8, 1000, 1, make([]byte, 8), 9)...),
-		"self hit":     pkt(OpDamage, damageBody(8, 0x04, 8, 1000, 1, make([]byte, 8), 9)...),
-		"truncated":    pkt(OpDamage, damageBody(7, 0x05, 8, 1000, 1, make([]byte, 4), 9)...),
+		"wrong opcode": pkt(0x3805, damageBody(7, 0x04, 8, 1000, 1, nil, 9)...),
+		"bad switch":   pkt(OpDamage, damageBody(7, 0x03, 8, 1000, 1, nil, 9)...),
+		"self hit":     pkt(OpDamage, damageBody(8, 0x04, 8, 1000, 1, nil, 9)...),
+		"skill 0":      pkt(OpDamage, damageBody(7, 0x04, 8, 0, 1, nil, 9)...),
+		"skill huge":   pkt(OpDamage, damageBody(7, 0x04, 8, 300_000_000, 1, nil, 9)...),
+		"truncated":    pkt(OpDamage, damageBody(7, 0x06, 8, 1000, 1, nil, 9)[:14]...),
 		"empty":        pkt(OpDamage),
-		"switch > 255": pkt(OpDamage, damageBody(7, 0x104, 8, 1000, 1, make([]byte, 8), 9)...),
+		"varint > i32": pkt(OpDamage, damageBody(1<<31, 0x04, 8, 1000, 1, nil, 9)...),
 	}
 	for name, p := range cases {
 		if _, err := ParseDamage(p); err == nil {

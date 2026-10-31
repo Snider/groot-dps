@@ -29,8 +29,8 @@ func FuzzUnpack(f *testing.F) {
 }
 
 func FuzzParseDamage(f *testing.F) {
-	f.Add(pkt(OpDamage, damageBody(500, 0x05, 42, 11020100, 3, make([]byte, 11), 1234)...))
-	f.Add(pkt(OpDamage, damageBody(7, 0x04, 8, 1000, 1, make([]byte, 8), 999)...))
+	f.Add(pkt(OpDamage, damageBody(500, 0x06, 42, 11020100, 3, []byte{2, 0, 1}, 1234)...))
+	f.Add(pkt(OpDamage, cat(damageBody(7, 0x34, 8, 1000, 1, nil, 999), []byte{1, 1, 50})...))
 	f.Fuzz(func(t *testing.T, data []byte) {
 		ParseDamage(data)
 	})

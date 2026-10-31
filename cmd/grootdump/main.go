@@ -165,10 +165,13 @@ func printDamage(ts time.Time, p []byte) {
 	for _, t := range []struct {
 		on   bool
 		name string
-	}{{d.Crit, "crit"}, {d.Back, "back"}, {d.Front, "front"}, {d.Parry, "parry"}, {d.Perfect, "perfect"}, {d.Double, "double"}} {
+	}{{d.Crit(), "crit"}, {d.Miss(), "miss"}, {d.Resist(), "resist"}, {d.Back(), "back"}, {d.Front(), "front"}, {d.Parry(), "parry"}, {d.Perfect(), "perfect"}, {d.Double(), "double"}, {len(d.Absorbed) > 0, "shield"}} {
 		if t.on {
 			tags += " " + t.name
 		}
+	}
+	if len(d.Extra) > 0 {
+		tags += fmt.Sprintf(" +%v", d.Extra)
 	}
 	fmt.Printf("%s  %8d -> %-8d skill %-9d %10d%s\n", ts.Format("15:04:05.000"), d.Actor, d.Target, d.Skill, d.Amount, tags)
 }
