@@ -13,7 +13,7 @@
 
 ## Plan
 1. Get a `.pcapng` of a short fight (Snider: idle 10s, dummy 30s, kill + loot) into `testdata/` (git-ignored).
-2. ~~TDD the decoder~~ done on synthetic packets: `wire/` (framing, LZ4, damage), `tcp/` (reassembly), `cmd/grootdump`. **Next: verify against the real capture.**
+2. ~~TDD the decoder~~ done: `wire/` (framing, LZ4, damage, DoT/heal ticks), `tcp/` (reassembly), `cmd/grootdump`. Golden-tested against A2Tools' real records (2026-10-31). Still to port: spawns (`41 36`, boss vs trash, summon owners), names (`45 36`, `33 36`), party (`02 97`), death (`42 36`), loot attribution (A2Tools `parse_loot_attribution_actor_name`, `06 38` party scope).
 3. Aggregate: events → per-player DPS per fight (pure and fully tested).
 4. Thin live layer: Npcap capture → decoder → aggregator → CoreGO window.
 
