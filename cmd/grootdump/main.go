@@ -46,7 +46,7 @@ func main() {
 	list := flag.Bool("list", false, "print every game packet in order")
 	opFlag := flag.String("op", "", "only show this opcode, e.g. 0x3804")
 	showHex := flag.Bool("hex", false, "include full hex for shown packets")
-	damage := flag.Bool("damage", false, "decode and print damage packets")
+	damage := flag.Bool("damage", false, "decode and print damage packets and DoT/heal ticks")
 	flag.Parse()
 	if flag.NArg() != 1 {
 		fmt.Fprintln(os.Stderr, "usage: grootdump [-list] [-op 0x3804] [-hex] [-damage] capture.pcapng")
@@ -112,6 +112,9 @@ func main() {
 				}
 				if *damage && op == wire.OpDamage {
 					printDamage(ci.Timestamp, p)
+				}
+				if *damage && op == wire.OpDotDamage {
+					printTick(ci.Timestamp, p)
 				}
 			}
 		}
@@ -210,4 +213,21 @@ func summary(flows map[string]*flow) {
 func fail(err error) {
 	fmt.Fprintln(os.Stderr, "grootdump:", err)
 	os.Exit(1)
+}
+
+func printTick(ts time.Time, p []byte) {
+	t, err := wire.ParseTick(p)
+	if err != nil {
+		return // status and buff ticks land here too: not interesting
+	}
+	kind := "dot"
+	if t.HoT() {
+		kind = "hot"
+	} else if t.Heal() {
+		kind = "heal"
+	}
+	if len(t.Absorbed) > 0 {
+		kind += " shield"
+	}
+	fmt.Printf("%s  %8d -> %-8d skill %-9d %10d %s\n", ts.Format("15:04:05.000"), t.Actor, t.Target, t.Skill(), t.Amount, kind)
 }

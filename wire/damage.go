@@ -57,6 +57,7 @@ var (
 	ErrSelfHit   = errors.New("damage: actor == target")
 	ErrSkill     = errors.New("damage: skill out of range")
 	ErrShort     = errors.New("damage: packet too short")
+	ErrAmount    = errors.New("damage: amount out of range")
 )
 
 // ParseDamage decodes the first record of a 0x3804 packet.

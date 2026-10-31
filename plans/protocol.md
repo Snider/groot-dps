@@ -64,6 +64,18 @@ After length + opcode:
 
 Not ported yet: chained records (`01 00` then another record), the `03 00` heal suffix, A2Tools' fallback tail heuristics, and their compact skill `99745942`.
 
+## DoT / heal tick (`0x3805`)
+Golden ticks in `wire/dot_golden_test.go`.
+1. `target` varint
+2. `kind` u8, exact values (not a mask): `02`/`0A` damage, `01`/`09` heal, `0B` HoT; `+04` = damage into a shield (`06`/`0E`). `00` status and `08` buff carry nothing we use.
+3. `actor` varint (self-damage is noise, a self-heal is real)
+4. unknown varint
+5. `effect` u32 LE: skill = effect / 100
+6. `amount` varint (1..99,999,999)
+7. into a shield: count 1-8, then that many u32 shield effect ids. Other trailing bytes unknown.
+
+**Double counting:** A2Tools only counts damage ticks whose skill is on its curated DoT allowlist (`src/data/dot_skill_ids.json`, 2,641 ids). Everything else in `05 38` duplicates damage already sent as `04 38`. That's the aggregator's job, not the decoder's.
+
 ## From A2Tools' plugin decoders
 Plugins (github.com/taengu/A2Tools-Plugins, GPL-3, read at `24aaf21`, cloned in `ref/`) declare the frames they want in `manifest.json`: opcode bytes as on the wire, then fields in order (numbers only, `skip:N` = unknown bytes). `self=x` means the meter only passes it on when field `x` is your own character. **Unverified by us**: plugin authors' readings, not golden-tested. Promote a row to a decoder only with a real record.
 
