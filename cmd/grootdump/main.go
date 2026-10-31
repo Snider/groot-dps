@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: EUPL-1.2
+
 // grootdump reads a Wireshark capture and shows what Aion 2 sent us.
 //
 //	grootdump testdata/dummy.pcapng                 # opcode histogram per flow

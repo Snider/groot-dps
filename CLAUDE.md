@@ -43,6 +43,6 @@
 - **Unknown fields stay named `unknown`.** They're documented in `plans/protocol.md`. When we work one out, update the notes and the tests together. Every new data point goes in the `plans/dps-meter.md` table.
 - **Source of truth: A2Tools** (github.com/taengu/A2Tools-DPS-Meter, Rust/Tauri, GPL-3), cloned into `ref/` (git-ignored; `git -C ref/A2Tools-DPS-Meter pull` to update). It's mature and its tests use real records checked against the game's Damage Analyzer. TDD loop: lift a real record and its expected values from their tests into our golden tests, then write our own Go to pass them. Port facts and test vectors, not code. Note the commit we read at. Credit in the README. Kuroukihime's meter was the first reference; where they disagree, A2Tools wins.
 - **Before committing:** `./check.sh` (gofmt, vet, tests, Windows build). `./check.sh fuzz` after touching a decoder.
-- **Licence: EUPL-1.2** (`LICENSE`).
+- **Licence: EUPL-1.2** (`LICENSE`), Lethean style: every Go file starts with `// SPDX-License-Identifier: EUPL-1.2` (check.sh enforces it). Public repo: github.com/Snider/groot-dps.
 - **Open:** releases need checksums so the static can verify what they run.
 

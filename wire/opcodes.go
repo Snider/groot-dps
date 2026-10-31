@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: EUPL-1.2
+
 // Package wire decodes Aion 2's server→client TCP stream into game packets.
 // Protocol notes: plans/protocol.md.
 package wire

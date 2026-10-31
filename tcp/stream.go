@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: EUPL-1.2
+
 // Package tcp puts one direction of a TCP connection back in order.
 package tcp
 
