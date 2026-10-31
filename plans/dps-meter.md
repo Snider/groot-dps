@@ -13,8 +13,8 @@
 
 ## Plan
 1. Get a `.pcapng` of a short fight (Snider: idle 10s, dummy 30s, kill + loot) into `testdata/` (git-ignored).
-2. ~~TDD the decoder~~ done: `wire/` (framing, LZ4, damage, DoT/heal ticks), `tcp/` (reassembly), `cmd/grootdump`. Golden-tested against A2Tools' real records (2026-10-31). Still to port: spawns (`41 36`, boss vs trash, summon owners), names (`45 36`, `33 36`), party (`02 97`), death (`42 36`), loot attribution (A2Tools `parse_loot_attribution_actor_name`, `06 38` party scope).
-3. ~~Aggregate~~ done: `meter/` (fights per target, 30s idle reset, DPS over max(fight, 1s), share %, crits, per-skill rows, summons → owner, monster hits = damage taken, player-on-player = heals, DoT allowlist, heals in the fight window). `grootdump -meter -dots ids.json`. **Not yet:** a real capture through it, names, boss vs trash, deaths, multi-target fights.
+2. ~~TDD the decoder~~ done: `wire/` (framing, LZ4, damage, DoT/heal ticks), `tcp/` (reassembly), `cmd/grootdump`. Golden-tested against A2Tools' real records (2026-10-31). Names (`33 36`, `45 36`) and party (`02 97`) done, joined in `meter/` by name. Still to port: spawns (`41 36`, boss vs trash, summon owners), party left, death (`42 36`), loot attribution (A2Tools `parse_loot_attribution_actor_name`, `06 38` party scope).
+3. ~~Aggregate~~ done: `meter/` (fights per target, 30s idle reset, DPS over max(fight, 1s), share %, crits, per-skill rows, summons → owner, monster hits = damage taken, player-on-player = heals, DoT allowlist, heals in the fight window). `grootdump -meter -dots ids.json`. **Not yet:** a real capture through it, boss vs trash, deaths, multi-target fights.
 4. Capture mode, pencilled in: `plans/capture.md`.
 5. Thin live layer: Npcap capture → decoder → aggregator → CoreGO window.
 

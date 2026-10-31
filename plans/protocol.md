@@ -76,6 +76,29 @@ Golden ticks in `wire/dot_golden_test.go`.
 
 **Double counting:** A2Tools only counts damage ticks whose skill is on its curated DoT allowlist (`src/data/dot_skill_ids.json`, 2,641 ids). Everything else in `05 38` duplicates damage already sent as `04 38`. That's the aggregator's job, not the decoder's.
 
+## Identity: you (`33 36`) and other players (`45 36`, `44 36` before June 2026)
+Golden records in `wire/names_golden_test.go` (names scrubbed).
+1. `entity` varint (1..9,999,999; raid ids run past 99,999)
+2. `mask` u32
+3. `mask2` u8: bit 0 = a name follows (the other bits vary by patch; never match literal values)
+4. `len` u8 (1-48 bytes), then the UTF-8 name: 1-12 letters (any script) or digits, at least one letter. The whole field must be the name.
+5. Self only, straight after the name: `server` u16 (1000-2999, or it wasn't a real self record), `class` u32, unknown u8, `level` u32, `gearScore` u32. Combat power is near the end of the record (A2Tools `self_combat_power`, not ported).
+- A new character in the tutorial is `$` + random letters until named: still you, no name.
+- Entity ids are reissued on zone changes, so the latest name for an id wins.
+- Class ids come in fours: 5-8 Gladiator, 9-12 Templar, 13-16 Ranger, 17-20 Assassin, 21-24 Elementalist, 25-28 Sorcerer, 29-32 Cleric, 33-36 Chanter.
+
+## Party roster (`02 97`)
+**Members carry account ids, not entity ids: join them to identities by name.**
+1. `partyKey` u32, `titleLen` u8 (1-40) + UTF-8 title (the party name/LFG note), `size` u8 (1-12)
+2. `dungeon` u32 (instance + tier, e.g. 600091/2/3 for one den's three tiers), 2 pad, leader account u64, 3 pad
+3. `count` varint (1-12), then per member:
+   - `mask` u8, `slot` u8, `account` u64 (home world in its top u16), `nameLen` u8 + name
+   - `class` u32, `level` u32 (1-200), `gearScore` u32
+   - a variable gap, then `world` u16 (the home world again, or for a visitor the world they're on), u16, tag u8 (1-4), `combatPower` u64
+   - The width varies, so find the world u16 within 10 bytes. Failing that (a visitor), find any world 1000-2999 with a tag 1-4 and a power 1..100M after it.
+   - The next member is re-found by header: the next slot, a world in the account's top u16, a valid name, within 32 bytes. A vacant slot is `00 <slot>` + zero account + empty name; past one, look up to 48 bytes per slot for a later member.
+- Not ported: party left (A2Tools `parse_party_left_packet`), other parties' rosters (`is_other_party`), `06 38` party scope.
+
 ## From A2Tools' plugin decoders
 Plugins (github.com/taengu/A2Tools-Plugins, GPL-3, read at `24aaf21`, cloned in `ref/`) declare the frames they want in `manifest.json`: opcode bytes as on the wire, then fields in order (numbers only, `skip:N` = unknown bytes). `self=x` means the meter only passes it on when field `x` is your own character. **Unverified by us**: plugin authors' readings, not golden-tested. Promote a row to a decoder only with a real record.
 

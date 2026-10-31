@@ -44,3 +44,18 @@ func FuzzParseTick(f *testing.F) {
 		ParseTick(data)
 	})
 }
+
+func FuzzParseIdentity(f *testing.F) {
+	f.Add(frame([]byte{0x33, 0x36, 0xed, 0x74, 0x5e, 0x91, 0xc1, 0x28, 0x37, 0x02, 'G', 'r', 0x18, 0x05, 0x1e, 0, 0, 0, 1, 0x1c, 0, 0, 0, 0x7f, 1, 0, 0}))
+	f.Add(frame([]byte{0x45, 0x36, 0xd7, 0x48, 0, 0, 0, 0, 0x07, 0x01, 'A'}))
+	f.Fuzz(func(t *testing.T, data []byte) {
+		ParseIdentity(data)
+	})
+}
+
+func FuzzParseRoster(f *testing.F) {
+	f.Add(frame(cat([]byte{0x02, 0x97, 1, 2, 3, 4, 2, 'h', 'i', 5}, make([]byte, 17), []byte{2, 0, 1}, make([]byte, 6), []byte{0x09, 0x09, 2, 'A', 'b'}, make([]byte, 40))))
+	f.Fuzz(func(t *testing.T, data []byte) {
+		ParseRoster(data)
+	})
+}

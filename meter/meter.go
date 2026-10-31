@@ -59,6 +59,11 @@ func (f *Fight) Counts() bool    { return f.Duration() >= MinFightMS }
 
 type Row struct {
 	Actor       uint32 // the owner, for summons
+	Name        string // "" until an identity record names them
+	Class       wire.Class
+	CombatPower uint64 // from the party roster
+	Self        bool
+	InParty     bool
 	Amount      uint64
 	DPS, Share  float64 // Share in %
 	Hits, Crits uint64
@@ -88,12 +93,16 @@ type Meter struct {
 	owners    map[uint32]uint32
 	players   map[uint32]bool
 	heals     []heal
+	names     map[uint32]string
+	me        uint32 // 0 until a self record arrives
+	myClass   wire.Class
+	party     map[string]wire.Member // by name: rosters carry account ids, not entity ids
 }
 
 // New takes the DoT skills whose damage ticks count. The rest of 05 38 damage
 // repeats what 04 38 already sent.
 func New(dotSkills map[uint32]bool) *Meter {
-	return &Meter{dotSkills: dotSkills, fights: map[uint32]*Fight{}, owners: map[uint32]uint32{}, players: map[uint32]bool{}}
+	return &Meter{dotSkills: dotSkills, fights: map[uint32]*Fight{}, owners: map[uint32]uint32{}, players: map[uint32]bool{}, names: map[uint32]string{}, party: map[string]wire.Member{}}
 }
 
 // Link records that summon belongs to owner (from a spawn or a spirit's link record).
@@ -101,6 +110,60 @@ func (m *Meter) Link(summon, owner uint32) {
 	if summon != owner {
 		m.owners[summon] = owner
 		delete(m.players, summon)
+	}
+}
+
+// Identify binds an entity to a character (33 36 you, 45 36 another player).
+// The latest name wins: entity ids get reissued on zone changes.
+func (m *Meter) Identify(id wire.Identity) {
+	m.players[id.Entity] = true
+	delete(m.owners, id.Entity)
+	if id.Self {
+		m.me, m.myClass = id.Entity, id.Class
+	}
+	if id.Name != "" {
+		m.names[id.Entity] = id.Name
+	}
+}
+
+// SetParty replaces the party with this roster's members.
+func (m *Meter) SetParty(r wire.Roster) {
+	m.party = map[string]wire.Member{}
+	for _, mem := range r.Members {
+		m.party[mem.Name] = mem
+	}
+}
+
+func (m *Meter) inParty(id uint32) bool {
+	if id == m.me && m.me != 0 {
+		return true
+	}
+	_, ok := m.party[m.names[id]]
+	return ok && m.names[id] != ""
+}
+
+// Ours: you or your party hit this target (a fight only strangers had isn't).
+func (m *Meter) Ours(f *Fight) bool {
+	if f == nil {
+		return false
+	}
+	for id := range f.Actors {
+		if m.inParty(m.Owner(id)) {
+			return true
+		}
+	}
+	return false
+}
+
+func (m *Meter) describe(r *Row) {
+	r.Name = m.names[r.Actor]
+	r.Self = r.Actor == m.me && m.me != 0
+	r.InParty = m.inParty(r.Actor)
+	if r.Self {
+		r.Class = m.myClass
+	}
+	if mem, ok := m.party[r.Name]; ok && r.Name != "" {
+		r.Class, r.CombatPower = mem.Class, mem.CombatPower
 	}
 }
 
@@ -188,6 +251,7 @@ func (m *Meter) Rows(target uint32) []Row {
 		r := byOwner[o]
 		if r == nil {
 			r = &Row{Actor: o}
+			m.describe(r)
 			byOwner[o], skills[o] = r, map[uint32]*SkillRow{}
 		}
 		r.Amount, r.Hits, r.Crits = r.Amount+a.amount, r.Hits+a.hits, r.Crits+a.crits

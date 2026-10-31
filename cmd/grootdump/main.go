@@ -274,18 +274,45 @@ func feedMeter(m *meter.Meter, at int64, op uint16, p []byte) {
 		if t, err := wire.ParseTick(p); err == nil {
 			m.Add(meter.FromTick(at, t))
 		}
+	case wire.OpPlayerInfo, wire.OpOtherPlayers, wire.OpPlayerSpawnOld:
+		if id, err := wire.ParseIdentity(p); err == nil {
+			m.Identify(id)
+		}
+	case wire.OpPartyInfo:
+		if r, err := wire.ParseRoster(p); err == nil {
+			m.SetParty(r)
+		}
 	}
 }
 
 func printMeter(m *meter.Meter) {
-	fights := m.Fights()
+	all := m.Fights()
+	var fights []*meter.Fight
+	for _, f := range all {
+		if m.Ours(f) {
+			fights = append(fights, f)
+		}
+	}
+	if len(fights) == 0 { // we never saw who you are: show everything
+		fights = all
+	}
 	if len(fights) == 0 {
 		fmt.Println("no fights of 5s or more")
 	}
 	for _, f := range fights {
 		fmt.Printf("\ntarget %d  %.1fs  %d damage\n", f.Target, float64(f.Duration())/1000, f.Total)
 		for _, r := range m.Rows(f.Target) {
-			fmt.Printf("  %8d  %10d  %9.0f dps  %5.1f%%  %d hits  %d crits\n", r.Actor, r.Amount, r.DPS, r.Share, r.Hits, r.Crits)
+			who := r.Name
+			if who == "" {
+				who = fmt.Sprintf("#%d", r.Actor)
+			}
+			mark := " "
+			if r.Self {
+				mark = ">"
+			} else if r.InParty {
+				mark = "*"
+			}
+			fmt.Printf(" %s %-12s %-12s %10d  %9.0f dps  %5.1f%%  %d hits  %d crits\n", mark, who, r.Class, r.Amount, r.DPS, r.Share, r.Hits, r.Crits)
 		}
 		for _, h := range m.HealRows(f.Target) {
 			fmt.Printf("  %8d  %10d  %9.0f hps\n", h.Actor, h.Amount, h.PerSecond)
