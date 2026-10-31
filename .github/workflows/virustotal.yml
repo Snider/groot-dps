@@ -1,0 +1,32 @@
+# Scan a published release's grootdps.exe on VirusTotal and put the link in its notes.
+# Run it from the Actions tab (or: gh workflow run virustotal.yml -f tag=v0.1.0).
+name: virustotal
+on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: release tag to scan
+        required: true
+permissions:
+  contents: write
+jobs:
+  scan:
+    runs-on: ubuntu-latest
+    steps:
+      - name: scan
+        env:
+          GH_TOKEN: ${{ github.token }}
+          VT_API_KEY: ${{ secrets.VT_API_KEY }}
+          TAG: ${{ inputs.tag }}
+        run: |
+          [ -n "$VT_API_KEY" ] || { echo "no VT_API_KEY secret"; exit 1; }
+          gh release download "$TAG" -R "$GITHUB_REPOSITORY" -p grootdps.exe
+          sha=$(sha256sum grootdps.exe | cut -d' ' -f1)
+          curl -fsS --request POST https://www.virustotal.com/api/v3/files \
+            -H "x-apikey: $VT_API_KEY" -F "file=@grootdps.exe" > /dev/null
+          link="https://www.virustotal.com/gui/file/$sha"
+          gh release view "$TAG" -R "$GITHUB_REPOSITORY" --json body --jq .body > notes.md
+          sed -i "s#^- VirusTotal: .*#- VirusTotal scan of grootdps.exe: $link#" notes.md
+          grep -q "$link" notes.md || sed -i "1a\\\\n- VirusTotal scan of grootdps.exe: $link" notes.md
+          gh release edit "$TAG" -R "$GITHUB_REPOSITORY" --notes-file notes.md
+          echo "$link"
