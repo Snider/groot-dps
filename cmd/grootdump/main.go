@@ -6,10 +6,12 @@
 //	grootdump -list testdata/dummy.pcapng           # every packet, in order (loot hunting)
 //	grootdump -op 0x3804 -hex testdata/dummy.pcapng # just damage, with hex
 //	grootdump -damage testdata/dummy.pcapng         # decoded hits
+//	grootdump -meter -dots dot_skill_ids.json x.pcapng # DPS per fight (the DoT allowlist is a JSON list of skill ids)
 package main
 
 import (
 	"encoding/hex"
+	"encoding/json"
 	"flag"
 	"fmt"
 	"io"
@@ -22,6 +24,7 @@ import (
 	"github.com/google/gopacket/layers"
 	"github.com/google/gopacket/pcapgo"
 
+	"groot/dps/meter"
 	"groot/dps/tcp"
 	"groot/dps/wire"
 )
@@ -47,9 +50,11 @@ func main() {
 	opFlag := flag.String("op", "", "only show this opcode, e.g. 0x3804")
 	showHex := flag.Bool("hex", false, "include full hex for shown packets")
 	damage := flag.Bool("damage", false, "decode and print damage packets and DoT/heal ticks")
+	showMeter := flag.Bool("meter", false, "print DPS per fight at the end")
+	dotsFile := flag.String("dots", "", "JSON list of DoT skill ids whose damage ticks count (with -meter)")
 	flag.Parse()
 	if flag.NArg() != 1 {
-		fmt.Fprintln(os.Stderr, "usage: grootdump [-list] [-op 0x3804] [-hex] [-damage] capture.pcapng")
+		fmt.Fprintln(os.Stderr, "usage: grootdump [-list] [-op 0x3804] [-hex] [-damage] [-meter [-dots ids.json]] capture.pcapng")
 		os.Exit(2)
 	}
 
@@ -68,6 +73,7 @@ func main() {
 	}
 	defer closeFn()
 
+	m := meter.New(loadDots(*dotsFile))
 	flows := map[string]*flow{}
 	for {
 		data, ci, err := r.ReadPacketData()
@@ -116,11 +122,17 @@ func main() {
 				if *damage && op == wire.OpDotDamage {
 					printTick(ci.Timestamp, p)
 				}
+				if *showMeter {
+					feedMeter(m, ci.Timestamp.UnixMilli(), op, p)
+				}
 			}
 		}
 	}
 
-	if *list || only >= 0 || *damage {
+	if *showMeter {
+		printMeter(m)
+	}
+	if *list || only >= 0 || *damage || *showMeter {
 		return
 	}
 	summary(flows)
@@ -230,4 +242,53 @@ func printTick(ts time.Time, p []byte) {
 		kind += " shield"
 	}
 	fmt.Printf("%s  %8d -> %-8d skill %-9d %10d %s\n", ts.Format("15:04:05.000"), t.Actor, t.Target, t.Skill(), t.Amount, kind)
+}
+
+func loadDots(path string) map[uint32]bool {
+	if path == "" {
+		fmt.Fprintln(os.Stderr, "no -dots list: DoT ticks won't count (A2Tools' src/data/dot_skill_ids.json works)")
+		return nil
+	}
+	b, err := os.ReadFile(path)
+	if err != nil {
+		fail(err)
+	}
+	var ids []uint32
+	if err := json.Unmarshal(b, &ids); err != nil {
+		fail(fmt.Errorf("%s: %w", path, err))
+	}
+	dots := make(map[uint32]bool, len(ids))
+	for _, id := range ids {
+		dots[id] = true
+	}
+	return dots
+}
+
+func feedMeter(m *meter.Meter, at int64, op uint16, p []byte) {
+	switch op {
+	case wire.OpDamage:
+		if d, err := wire.ParseDamage(p); err == nil && !d.NoValue {
+			m.Add(meter.FromDamage(at, d))
+		}
+	case wire.OpDotDamage:
+		if t, err := wire.ParseTick(p); err == nil {
+			m.Add(meter.FromTick(at, t))
+		}
+	}
+}
+
+func printMeter(m *meter.Meter) {
+	fights := m.Fights()
+	if len(fights) == 0 {
+		fmt.Println("no fights of 5s or more")
+	}
+	for _, f := range fights {
+		fmt.Printf("\ntarget %d  %.1fs  %d damage\n", f.Target, float64(f.Duration())/1000, f.Total)
+		for _, r := range m.Rows(f.Target) {
+			fmt.Printf("  %8d  %10d  %9.0f dps  %5.1f%%  %d hits  %d crits\n", r.Actor, r.Amount, r.DPS, r.Share, r.Hits, r.Crits)
+		}
+		for _, h := range m.HealRows(f.Target) {
+			fmt.Printf("  %8d  %10d  %9.0f hps\n", h.Actor, h.Amount, h.PerSecond)
+		}
+	}
 }

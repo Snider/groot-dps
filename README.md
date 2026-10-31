@@ -5,6 +5,7 @@ A DPS meter for Aion 2 that only reads a copy of the network traffic (Npcap). It
 ## Layout
 - `wire/`: game stream → packets (varint framing, LZ4 containers) and decoders (damage so far)
 - `tcp/`: puts TCP segments back in order
+- `meter/`: hits → fights → DPS rows (pure; rules from A2Tools)
 - `cmd/grootdump`: reads a Wireshark capture and shows what the game sent
 - `plans/`: the plan, protocol notes and data points spotted
 
@@ -14,6 +15,7 @@ go run ./cmd/grootdump testdata/fight.pcapng          # opcode histogram per flo
 go run ./cmd/grootdump -damage testdata/fight.pcapng  # decoded hits
 go run ./cmd/grootdump -list testdata/fight.pcapng    # every packet in order (hunting loot)
 go run ./cmd/grootdump -op 0x3804 -hex testdata/fight.pcapng
+go run ./cmd/grootdump -meter -dots ref/A2Tools-DPS-Meter/src/data/dot_skill_ids.json testdata/fight.pcapng  # DPS per fight
 ```
 Captures go in `testdata/` and are git-ignored, because they contain character names.
 
