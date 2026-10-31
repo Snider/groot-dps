@@ -447,3 +447,41 @@ func boolCmp(a, b bool) int {
 	}
 	return -1
 }
+
+// Current is the fight to show: your latest (anyone's until we know you), but
+// a boss over the trash around it while the boss fight is live.
+func (m *Meter) Current() *Fight {
+	var cands []*Fight
+	for _, f := range m.fights {
+		if m.Ours(f) {
+			cands = append(cands, f)
+		}
+	}
+	if len(cands) == 0 {
+		for _, f := range m.fights {
+			cands = append(cands, f)
+		}
+	}
+	var latest, boss *Fight
+	for _, f := range cands {
+		if latest == nil || f.End > latest.End || f.End == latest.End && f.Target < latest.Target {
+			latest = f
+		}
+		if f.Boss && (boss == nil || f.End > boss.End) {
+			boss = f
+		}
+	}
+	if boss != nil && boss.End >= latest.End-IdleResetMS {
+		return boss
+	}
+	return latest
+}
+
+// Reset clears fights, heals and deaths. Who's who (names, party, pets, you) stays.
+func (m *Meter) Reset() {
+	m.fights = map[uint32]*Fight{}
+	m.heals, m.deaths = nil, nil
+}
+
+// Name is the character name for an entity, "" if nobody has said.
+func (m *Meter) Name(id uint32) string { return m.names[id] }

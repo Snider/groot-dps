@@ -24,6 +24,7 @@ import (
 	"github.com/google/gopacket/layers"
 	"github.com/google/gopacket/pcapgo"
 
+	"groot/dps/live"
 	"groot/dps/meter"
 	"groot/dps/tcp"
 	"groot/dps/wire"
@@ -123,7 +124,7 @@ func main() {
 					printTick(ci.Timestamp, p)
 				}
 				if *showMeter {
-					feedMeter(m, ci.Timestamp.UnixMilli(), op, p)
+					live.Dispatch(m, ci.Timestamp.UnixMilli(), p)
 				}
 			}
 		}
@@ -262,43 +263,6 @@ func loadDots(path string) map[uint32]bool {
 		dots[id] = true
 	}
 	return dots
-}
-
-func feedMeter(m *meter.Meter, at int64, op uint16, p []byte) {
-	switch op {
-	case wire.OpDamage:
-		if d, err := wire.ParseDamage(p); err == nil && !d.NoValue {
-			m.Add(meter.FromDamage(at, d))
-		}
-	case wire.OpDotDamage:
-		if t, err := wire.ParseTick(p); err == nil {
-			m.Add(meter.FromTick(at, t))
-		}
-	case wire.OpPlayerInfo, wire.OpOtherPlayers, wire.OpPlayerSpawnOld:
-		if id, err := wire.ParseIdentity(p); err == nil {
-			m.Identify(id)
-		}
-	case wire.OpSelfStats:
-		if id, ok := wire.EntityOf(p); ok {
-			m.SelfStats(id)
-		}
-	case wire.OpPartyScope:
-		if id, ok := wire.EntityOf(p); ok {
-			m.PartyScope(id)
-		}
-	case wire.OpPartyInfo:
-		if r, err := wire.ParseRoster(p); err == nil {
-			m.SetParty(r)
-		}
-	case wire.OpMobSpawn, wire.OpMobSpawnOld:
-		if sp, err := wire.ParseSpawn(p); err == nil {
-			m.Spawn(sp)
-		}
-	case wire.OpDeath:
-		if d, err := wire.ParseDeath(p); err == nil {
-			m.Death(at, d)
-		}
-	}
 }
 
 func printMeter(m *meter.Meter) {
