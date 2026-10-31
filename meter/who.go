@@ -82,12 +82,30 @@ func (m *Meter) PartyScope(id uint32) {
 	}
 }
 
-// SetParty replaces the party with this roster's members.
+// SetParty takes a roster: yours, unless we know your party's key and this
+// is a complete roster of another party without you in it.
 func (m *Meter) SetParty(r wire.Roster) {
+	me := m.names[m.me]
+	mine := false
+	for _, mem := range r.Members {
+		mine = mine || me != "" && mem.Name == me
+	}
+	if !mine && r.Complete && m.partyKey != 0 && r.Key != m.partyKey {
+		return
+	}
+	if mine {
+		m.partyKey = r.Key
+	}
 	m.party = map[string]wire.Member{}
 	for _, mem := range r.Members {
 		m.party[mem.Name] = mem
 	}
+}
+
+// LeaveParty: you left (or the party ended).
+func (m *Meter) LeaveParty() {
+	m.party = map[string]wire.Member{}
+	m.partyKey = 0
 }
 
 func (m *Meter) inParty(id uint32) bool {

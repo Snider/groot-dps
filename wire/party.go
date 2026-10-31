@@ -199,3 +199,19 @@ func vacantSlot(d []byte, from int, slot uint8) (int, bool) {
 	}
 	return 0, false
 }
+
+const (
+	OpPartyLeft         uint16 = 0x9213 // you left an open-world party
+	OpPartyLeftInstance uint16 = 0x971D // you left a dungeon or raid party
+)
+
+// PartyLeft: 13 92 00 00 or 1D 97 00 00, and nothing after.
+func PartyLeft(p []byte) bool {
+	op, ok := Opcode(p)
+	if !ok || op != OpPartyLeft && op != OpPartyLeftInstance {
+		return false
+	}
+	_, n := uvarint(p)
+	body := p[n+2:]
+	return len(body) == 2 && body[0] == 0 && body[1] == 0
+}

@@ -146,6 +146,10 @@ func Dispatch(m *meter.Meter, at int64, p []byte) {
 		if r, err := wire.ParseRoster(p); err == nil {
 			m.SetParty(r)
 		}
+	case wire.OpPartyLeft, wire.OpPartyLeftInstance:
+		if wire.PartyLeft(p) {
+			m.LeaveParty()
+		}
 	case wire.OpMobSpawn, wire.OpMobSpawnOld:
 		if sp, err := wire.ParseSpawn(p); err == nil {
 			m.Spawn(sp)

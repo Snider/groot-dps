@@ -75,3 +75,19 @@ func TestGoldenDeath(t *testing.T) {
 		t.Fatalf("got %+v, %v", d, err)
 	}
 }
+
+// Leaving a party: 13 92 00 00 (open world) or 1D 97 00 00 (dungeon, raid),
+// nothing after (A2Tools' captures, 2026-10-13/14).
+func TestPartyLeft(t *testing.T) {
+	for rec, want := range map[string]bool{
+		"13920000":   true,
+		"1d970000":   true,
+		"1392000001": false, // something after: not a leave
+		"1f9203":     false,
+		"13920100":   false,
+	} {
+		if got := PartyLeft(frameOf(t, rec)); got != want {
+			t.Errorf("%s: %v, want %v", rec, got, want)
+		}
+	}
+}

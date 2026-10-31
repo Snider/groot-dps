@@ -77,6 +77,7 @@ type Meter struct {
 	scope     map[uint32]uint32 // 06 38 records per entity
 	myClass   wire.Class
 	party     map[string]wire.Member // by name: rosters carry account ids, not entity ids
+	partyKey  uint32                 // your party's, once a roster with you in it said
 	npcs      map[uint32]wire.Spawn
 	gone      map[uint32]bool // left the world (a spirit unsummoned)
 	deaths    []death

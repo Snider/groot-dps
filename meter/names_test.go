@@ -77,3 +77,31 @@ func TestSelfWithoutANameIsStillYou(t *testing.T) {
 		t.Fatalf("%+v", r)
 	}
 }
+
+func TestLeavingClearsTheParty(t *testing.T) {
+	m := partyMeter()
+	m.LeaveParty()
+	m.Add(hit(0, cleric, boss, 17_050_240, 1))
+	if r := m.Rows(boss)[0]; r.InParty {
+		t.Fatalf("still in party: %+v", r)
+	}
+}
+
+// Once your own roster has given your party's key, another party's complete
+// roster (without you) doesn't replace yours.
+func TestAnotherPartysRosterIsIgnored(t *testing.T) {
+	m := New(nil)
+	m.Identify(wire.Identity{Entity: groot, Self: true, Name: "Groot"})
+	m.Identify(wire.Identity{Entity: cleric, Name: "Pinky"})
+	m.SetParty(wire.Roster{Key: 7, Complete: true, Members: []wire.Member{{Name: "Groot"}, {Name: "Pinky"}}})
+	m.SetParty(wire.Roster{Key: 9, Complete: true, Members: []wire.Member{{Name: "Rando"}, {Name: "Other"}}})
+	m.Add(hit(0, cleric, boss, 17_050_240, 1))
+	if r := m.Rows(boss)[0]; !r.InParty {
+		t.Fatal("lost our party to someone else's roster")
+	}
+	// A roster of our own party (same key) still updates it.
+	m.SetParty(wire.Roster{Key: 7, Complete: true, Members: []wire.Member{{Name: "Groot"}}})
+	if r := m.Rows(boss)[0]; r.InParty {
+		t.Fatal("our own roster didn't update")
+	}
+}

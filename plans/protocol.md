@@ -100,7 +100,8 @@ Golden records in `wire/names_golden_test.go` (names scrubbed).
    - a variable gap, then `world` u16 (the home world again, or for a visitor the world they're on), u16, tag u8 (1-4), `combatPower` u64
    - The width varies, so find the world u16 within 10 bytes. Failing that (a visitor), find any world 1000-2999 with a tag 1-4 and a power 1..100M after it.
    - The next member is re-found by header: the next slot, a world in the account's top u16, a valid name, within 32 bytes. A vacant slot is `00 <slot>` + zero account + empty name; past one, look up to 48 bytes per slot for a later member.
-- Not ported: party left (A2Tools `parse_party_left_packet`), other parties' rosters (`is_other_party`), `06 38` party scope.
+- **Leaving:** a frame that is exactly `13 92 00 00` (open-world party) or `1D 97 00 00` (dungeon/raid), nothing after. `1F 92 03` came when the last other member left; `1B 97 <key>` followed leaving a raid.
+- **Other parties' rosters arrive too** (raids, nearby groups). Once a roster with you in it has given your party's key, a complete roster with another key and without you is someone else's: ignore it.
 
 ## Spawn (`41 36`, `40 36` before June 2026)
 NPCs, summons/pets and skill effects, never real players. Golden spawns in `wire/spawn_golden_test.go`.
