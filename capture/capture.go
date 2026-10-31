@@ -8,6 +8,7 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"net"
 	"os"
 	"time"
 
@@ -20,15 +21,18 @@ import (
 type Handler func(at time.Time, flow string, seq uint32, payload []byte)
 
 // Frame decodes one captured frame and hands it on if it's a server → client
-// TCP segment with data. The game server's port is below the client's
-// ephemeral one, which is how we tell the directions apart.
-func Frame(data []byte, lt layers.LinkType, at time.Time, h Handler) {
+// TCP segment with data.
+func Frame(data []byte, lt layers.LinkType, at time.Time, dir Direction, h Handler) {
 	pk := gopacket.NewPacket(data, lt, gopacket.DecodeOptions{Lazy: true, NoCopy: true})
 	t, _ := pk.Layer(layers.LayerTypeTCP).(*layers.TCP)
-	if t == nil || pk.NetworkLayer() == nil || len(t.Payload) == 0 || t.SrcPort >= t.DstPort {
+	if t == nil || pk.NetworkLayer() == nil || len(t.Payload) == 0 {
 		return
 	}
 	src, dst := pk.NetworkLayer().NetworkFlow().Endpoints()
+	srcIP, dstIP := net.IP(src.Raw()), net.IP(dst.Raw())
+	if !dir.Inbound(srcIP, dstIP, uint16(t.SrcPort), uint16(t.DstPort)) {
+		return
+	}
 	h(at, fmt.Sprintf("%v:%d>%v:%d", src, t.SrcPort, dst, t.DstPort), t.Seq, t.Payload)
 }
 
@@ -88,7 +92,7 @@ func Replay(ctx context.Context, path string, realtime bool, h Handler) error {
 			}
 			at = time.Now()
 		}
-		Frame(data, r.LinkType(), at, h)
+		Frame(data, r.LinkType(), at, Direction{}, h)
 	}
 	return nil
 }

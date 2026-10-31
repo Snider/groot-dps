@@ -20,6 +20,12 @@ func Live(ctx context.Context, h Handler, logf func(string, ...any)) error {
 	if err != nil {
 		return fmt.Errorf("no capture driver (install Npcap): %w", err)
 	}
+	var dir Direction // inbound = to one of this PC's addresses
+	for _, d := range devs {
+		for _, a := range d.Addresses {
+			dir.Local = append(dir.Local, a.IP)
+		}
+	}
 	var mu sync.Mutex // h isn't asked to be safe for concurrent use
 	var wg sync.WaitGroup
 	opened := 0
@@ -50,7 +56,7 @@ func Live(ctx context.Context, h Handler, logf func(string, ...any)) error {
 					return
 				}
 				mu.Lock()
-				Frame(data, lt, ci.Timestamp, h)
+				Frame(data, lt, ci.Timestamp, dir, h)
 				mu.Unlock()
 			}
 		}()

@@ -43,9 +43,9 @@ func collect(out *[]got) Handler {
 
 func TestFrameKeepsServerToClientData(t *testing.T) {
 	var out []got
-	Frame(tcpFrame(t, 7777, 50123, 42, []byte("game")), layers.LinkTypeEthernet, time.Now(), collect(&out))
-	Frame(tcpFrame(t, 50123, 7777, 9, []byte("from us")), layers.LinkTypeEthernet, time.Now(), collect(&out))
-	Frame(tcpFrame(t, 7777, 50123, 46, nil), layers.LinkTypeEthernet, time.Now(), collect(&out)) // a bare ACK
+	Frame(tcpFrame(t, 7777, 50123, 42, []byte("game")), layers.LinkTypeEthernet, time.Now(), Direction{}, collect(&out))
+	Frame(swapped(t, tcpFrame(t, 50123, 7777, 9, []byte("from us"))), layers.LinkTypeEthernet, time.Now(), Direction{}, collect(&out))
+	Frame(tcpFrame(t, 7777, 50123, 46, nil), layers.LinkTypeEthernet, time.Now(), Direction{}, collect(&out)) // a bare ACK
 	if len(out) != 1 || out[0].flow != "203.0.113.5:7777>192.168.1.20:50123" || out[0].seq != 42 || string(out[0].payload) != "game" {
 		t.Fatalf("got %+v", out)
 	}
@@ -72,4 +72,20 @@ func TestReplayReadsAPcap(t *testing.T) {
 	if len(out) != 2 || string(out[0].payload)+string(out[1].payload) != "abcd" {
 		t.Fatalf("got %+v", out)
 	}
+}
+
+// swapped turns a frame around: from us (192.168.1.20) to the server.
+func swapped(t *testing.T, f []byte) []byte {
+	t.Helper()
+	pk := gopacket.NewPacket(f, layers.LinkTypeEthernet, gopacket.Default)
+	eth := pk.Layer(layers.LayerTypeEthernet).(*layers.Ethernet)
+	ip := pk.Layer(layers.LayerTypeIPv4).(*layers.IPv4)
+	tcp := pk.Layer(layers.LayerTypeTCP).(*layers.TCP)
+	ip.SrcIP, ip.DstIP = ip.DstIP, ip.SrcIP
+	tcp.SetNetworkLayerForChecksum(ip)
+	buf := gopacket.NewSerializeBuffer()
+	if err := gopacket.SerializeLayers(buf, gopacket.SerializeOptions{FixLengths: true, ComputeChecksums: true}, eth, ip, tcp, gopacket.Payload(tcp.Payload)); err != nil {
+		t.Fatal(err)
+	}
+	return buf.Bytes()
 }

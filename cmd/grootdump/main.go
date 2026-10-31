@@ -15,6 +15,7 @@ import (
 	"flag"
 	"fmt"
 	"io"
+	"net"
 	"os"
 	"sort"
 	"strconv"
@@ -24,6 +25,7 @@ import (
 	"github.com/google/gopacket/layers"
 	"github.com/google/gopacket/pcapgo"
 
+	"groot/dps/capture"
 	"groot/dps/live"
 	"groot/dps/meter"
 	"groot/dps/tcp"
@@ -44,6 +46,7 @@ type flow struct {
 	gaps     int
 	first    time.Time
 	lastSeen time.Time
+	inbound  bool // server → client
 }
 
 func main() {
@@ -93,7 +96,8 @@ func main() {
 		key := fmt.Sprintf("%v:%d > %v:%d", src, t.SrcPort, dst, t.DstPort)
 		f := flows[key]
 		if f == nil {
-			f = &flow{name: key, counts: map[uint16]int{}, first: ci.Timestamp}
+			f = &flow{name: key, counts: map[uint16]int{}, first: ci.Timestamp,
+				inbound: capture.Direction{}.Inbound(net.IP(src.Raw()), net.IP(dst.Raw()), uint16(t.SrcPort), uint16(t.DstPort))}
 			flows[key] = f
 		}
 		f.lastSeen = ci.Timestamp
@@ -123,7 +127,7 @@ func main() {
 				if *damage && op == wire.OpDotDamage {
 					printTick(ci.Timestamp, p)
 				}
-				if *showMeter {
+				if *showMeter && f.inbound { // server → client only
 					live.Dispatch(m, ci.Timestamp.UnixMilli(), p)
 				}
 			}
