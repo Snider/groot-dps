@@ -19,12 +19,30 @@ Some meters only learn which character is yours when you load a zone, so you tel
 You show up marked as you straight away. Your name fills in at the next zone load, when the game sends your full character record. (These rules come from A2Tools' captures. We'll verify them on our own once the live meter runs.)
 
 ## Status
-The decoders and the maths are done and tested against real game records: damage, DoT/heal ticks, names, party, spawns (bosses spot themselves by their stagger gauge, pets find their owners) and deaths. Still to come: the live Windows window. Until then `grootdump` runs a capture through the meter.
+The decoders and the maths are done and tested against real game records: damage, DoT/heal ticks, names, party, spawns (bosses spot themselves by their stagger gauge, pets find their owners) and deaths. The window (`cmd/grootdps`, Wails v3) runs on Windows from Npcap, or anywhere from a capture file. Not yet tried against the live game.
+
+## Run it
+On Windows, with [Npcap](https://npcap.com) installed:
+```
+GOOS=windows GOARCH=amd64 CGO_ENABLED=0 go build -ldflags "-H windowsgui" -o grootdps.exe ./cmd/grootdps
+```
+Put `dot_skill_ids.json` next to `grootdps.exe` so DoT ticks count (A2Tools' `src/data/dot_skill_ids.json` works; it's their data, so it isn't in this repo). The window is a small always-on-top overlay: drag it by the top bar, ↺ clears the fights, DPS/HPS switches damage and healing.
+
+To work on the window without the game:
+```
+go run ./cmd/fakefight testdata/fake.pcap         # a made-up boss fight (golden records, made-up names)
+go run ./cmd/grootdps -replay testdata/fake.pcap  # plays it at its own pace
+```
+The window reads the meter through the app's own asset server, inside the process. No port is opened.
 
 ## Layout
 - `wire/`: game stream → packets (framing, LZ4 bundles) and decoders (damage, ticks, identities, party roster)
 - `tcp/`: puts TCP segments back in order
 - `meter/`: hits → fights → DPS rows, names, your party, which entity is you (pure, no IO)
+- `live/`: TCP segments → frames → meter, and the snapshot the window shows
+- `capture/`: capture files, and live Npcap on every adapter (read-only, server → client)
+- `cmd/grootdps`: the meter window (Wails v3, plain HTML/JS, no npm)
+- `cmd/fakefight`: writes a made-up fight capture for working on the window
 - `cmd/grootdump`: reads a Wireshark capture and shows what the game sent
 - `plans/`: the plan, protocol notes, data points spotted, capture mode
 

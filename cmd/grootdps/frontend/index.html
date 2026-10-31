@@ -1,0 +1,25 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>Groot DPS</title>
+  <link rel="stylesheet" href="style.css">
+  <script type="module" src="/wails/runtime.js"></script>
+  <script type="module" src="app.js"></script>
+</head>
+<body>
+  <main class="meter">
+    <header class="bar">
+      <span class="title" id="title">Waiting for a fight…</span>
+      <span class="meta" id="meta"></span>
+      <nav class="buttons">
+        <button id="mode" title="Damage / healing">DPS</button>
+        <button id="reset" title="Clear the fights">↺</button>
+        <button id="close" title="Close">×</button>
+      </nav>
+    </header>
+    <ol class="rows" id="rows"></ol>
+    <footer class="status" id="status">Listening. Nothing is sent anywhere.</footer>
+  </main>
+</body>
+</html>

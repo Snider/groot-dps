@@ -1,0 +1,34 @@
+/* SPDX-License-Identifier: EUPL-1.2 */
+:root {
+  --bg: rgba(18, 20, 24, 0.82);
+  --bar: rgba(255, 255, 255, 0.06);
+  --text: #e8e6e3;
+  --dim: #9a9a9a;
+  --you: #7fd6a4;
+  --font: "Segoe UI", system-ui, -apple-system, sans-serif;
+}
+* { box-sizing: border-box; }
+html, body { margin: 0; height: 100%; background: transparent; color: var(--text); font: 13px/1.3 var(--font); user-select: none; overflow: hidden; }
+.meter { height: 100%; display: flex; flex-direction: column; background: var(--bg); border-radius: 8px; border: 1px solid rgba(255,255,255,0.08); }
+.bar { display: flex; align-items: center; gap: 8px; padding: 6px 8px; --wails-draggable: drag; cursor: move; border-bottom: 1px solid rgba(255,255,255,0.06); }
+.title { font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.title .boss { color: #f0b35a; }
+.meta { color: var(--dim); white-space: nowrap; font-variant-numeric: tabular-nums; }
+.buttons { margin-left: auto; display: flex; gap: 2px; --wails-draggable: no-drag; }
+button { background: none; border: 0; color: var(--dim); font: inherit; padding: 2px 6px; border-radius: 4px; cursor: pointer; }
+button:hover { color: var(--text); background: rgba(255,255,255,0.08); }
+.rows { list-style: none; margin: 0; padding: 4px; flex: 1; overflow-y: auto; }
+.row { position: relative; display: flex; align-items: center; gap: 6px; height: 22px; padding: 0 6px; margin-bottom: 2px; border-radius: 4px; background: var(--bar); overflow: hidden; }
+.row .fill { position: absolute; inset: 0 auto 0 0; opacity: 0.35; border-radius: 4px; transition: width 0.4s ease; }
+.row > span { position: relative; }
+.row .name { flex: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.row.you .name { color: var(--you); font-weight: 600; }
+.row.stranger { opacity: 0.6; }
+.row .num { font-variant-numeric: tabular-nums; color: var(--text); }
+.row .pct { width: 42px; text-align: right; color: var(--dim); font-variant-numeric: tabular-nums; }
+.row .dead { color: #e07a7a; }
+.status { padding: 3px 8px; color: var(--dim); font-size: 11px; border-top: 1px solid rgba(255,255,255,0.06); }
+/* Class colours */
+.c-Gladiator { background: #c69b6d; } .c-Templar { background: #f48cba; } .c-Ranger { background: #abd473; }
+.c-Assassin { background: #fff569; } .c-Elementalist { background: #3fc7eb; } .c-Sorcerer { background: #8787ed; }
+.c-Cleric { background: #f2f2f2; } .c-Chanter { background: #ff9c3a; } .c- { background: #8a8a8a; }
