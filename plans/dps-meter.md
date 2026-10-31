@@ -13,8 +13,8 @@
 
 ## Plan
 1. Get a `.pcapng` of a short fight (Snider: idle 10s, dummy 30s, kill + loot) into `testdata/` (git-ignored).
-2. ~~TDD the decoder~~ done: `wire/` (framing, LZ4, damage, DoT/heal ticks), `tcp/` (reassembly), `cmd/grootdump`. Golden-tested against A2Tools' real records (2026-10-31). Names (`33 36`, `45 36`) and party (`02 97`) done, joined in `meter/` by name. Still to port: spawns (`41 36`, boss vs trash, summon owners), party left, death (`42 36`), loot attribution (A2Tools `parse_loot_attribution_actor_name`, `06 38` party scope).
-3. ~~Aggregate~~ done: `meter/` (fights per target, 30s idle reset, DPS over max(fight, 1s), share %, crits, per-skill rows, summons → owner, monster hits = damage taken, player-on-player = heals, DoT allowlist, heals in the fight window). `grootdump -meter -dots ids.json`. **Not yet:** a real capture through it, boss vs trash, deaths, multi-target fights.
+2. ~~TDD the decoder~~ done: `wire/` (framing, LZ4, damage, DoT/heal ticks), `tcp/` (reassembly), `cmd/grootdump`. Golden-tested against A2Tools' real records (2026-10-31). Names (`33 36`, `45 36`) and party (`02 97`) done, joined in `meter/` by name. Spawns (`41 36`: NPC code, HP, boss = stagger gauge, pet owners) and deaths (`42 36`) done. Still to port: party left, kill record (`04 8D`), loot attribution (A2Tools `parse_loot_attribution_actor_name`, `06 38` party scope).
+3. ~~Aggregate~~ done: `meter/` (fights per target, 30s idle reset, DPS over max(fight, 1s), share %, crits, per-skill rows, summons → owner, monster hits = damage taken, player-on-player = heals, DoT allowlist, heals in the fight window). `grootdump -meter -dots ids.json`. **Not yet:** a real capture through it, deaths, multi-target fights.
 4. Capture mode, pencilled in: `plans/capture.md`.
 5. Thin live layer: Npcap capture → decoder → aggregator → CoreGO window.
 
@@ -23,7 +23,7 @@ Running list of what the packets give us, even if we don't use it yet. The aim i
 
 | Data point | Packet / opcode | Fields | Seen in | Notes |
 |---|---|---|---|---|
-| Kill | `0x8D04` entity death | entity id | Kuroukihime | anchor for drops (what died, where, when) |
+| Kill | `0x3642` flag 3 (death), `0x8D04` (who got it) | entity id, owner, name | A2Tools | anchor for drops (what died, where, when, whose) |
 | Mob spawn | `0x3641` | mob id → name | Kuroukihime | boss vs trash, drop source |
 | Party | `0x9702` | members | Kuroukihime | tag drops per static run |
 | Loot | **unknown** | item, qty | — | ours to find: capture a kill + pickup |

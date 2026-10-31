@@ -290,6 +290,14 @@ func feedMeter(m *meter.Meter, at int64, op uint16, p []byte) {
 		if r, err := wire.ParseRoster(p); err == nil {
 			m.SetParty(r)
 		}
+	case wire.OpMobSpawn, wire.OpMobSpawnOld:
+		if sp, err := wire.ParseSpawn(p); err == nil {
+			m.Spawn(sp)
+		}
+	case wire.OpDeath:
+		if d, err := wire.ParseDeath(p); err == nil {
+			m.Death(at, d)
+		}
 	}
 }
 
@@ -308,7 +316,15 @@ func printMeter(m *meter.Meter) {
 		fmt.Println("no fights of 5s or more")
 	}
 	for _, f := range fights {
-		fmt.Printf("\ntarget %d  %.1fs  %d damage\n", f.Target, float64(f.Duration())/1000, f.Total)
+		what := "trash"
+		if f.Boss {
+			what = "BOSS"
+		}
+		end := ""
+		if f.Killed {
+			end = "  killed"
+		}
+		fmt.Printf("\n%s %d (npc %d, %d hp)  %.1fs  %d damage%s\n", what, f.Target, f.NPC, f.MaxHP, float64(f.Duration())/1000, f.Total, end)
 		for _, r := range m.Rows(f.Target) {
 			who := r.Name
 			if who == "" {
@@ -320,7 +336,11 @@ func printMeter(m *meter.Meter) {
 			} else if r.InParty {
 				mark = "*"
 			}
-			fmt.Printf(" %s %-12s %-12s %10d  %9.0f dps  %5.1f%%  %d hits  %d crits\n", mark, who, r.Class, r.Amount, r.DPS, r.Share, r.Hits, r.Crits)
+			died := ""
+			if r.Deaths > 0 {
+				died = fmt.Sprintf("  died %dx", r.Deaths)
+			}
+			fmt.Printf(" %s %-12s %-12s %10d  %9.0f dps  %5.1f%%  %d hits  %d crits%s\n", mark, who, r.Class, r.Amount, r.DPS, r.Share, r.Hits, r.Crits, died)
 		}
 		for _, h := range m.HealRows(f.Target) {
 			fmt.Printf("  %8d  %10d  %9.0f hps\n", h.Actor, h.Amount, h.PerSecond)

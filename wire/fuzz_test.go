@@ -59,3 +59,11 @@ func FuzzParseRoster(f *testing.F) {
 		ParseRoster(data)
 	})
 }
+
+func FuzzParseSpawn(f *testing.F) {
+	f.Add(frame([]byte{0x41, 0x36, 0xb4, 0xc6, 0x01, 0x5f, 0, 1, 2, 'A', 'b', 1, 2, 3, 0, 0, 2, 1, 5, 5, 6, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 9, 9, 0}))
+	f.Fuzz(func(t *testing.T, data []byte) {
+		ParseSpawn(data)
+		ParseDeath(data)
+	})
+}

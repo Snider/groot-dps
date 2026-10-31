@@ -21,7 +21,8 @@ const (
 	OpPartyInfo    uint16 = 0x9702
 	OpMobSpawn     uint16 = 0x3641
 	OpRemainHP     uint16 = 0x8D00
-	OpDeath        uint16 = 0x8D04
+	OpDeath        uint16 = 0x3642 // flag 1 loaded dead, 3 killed, 7 gone from the world
+	OpKill         uint16 = 0x8D04 // kill / summon-ownership record: names who got it (A2Tools ownership_at_front)
 	OpSelfStats    uint16 = 0x364A // about your own stats only
 	OpPartyScope   uint16 = 0x3806 // about you (and party, in older regions), several a second
 	OpContainer    uint16 = 0xFFFF // LZ4 block of more frames
@@ -37,7 +38,7 @@ var opNames = map[uint16]string{
 	OpSkillCast: "SkillCast", OpSkillCD: "SkillCD", OpBuffA: "BuffA", OpBuffB: "BuffB",
 	OpPlayerInfo: "PlayerInfo", OpOtherPlayers: "OtherPlayers", OpIDLink: "IDLink",
 	OpPlayerStats: "PlayerStats", OpPartyInfo: "PartyInfo", OpMobSpawn: "MobSpawn",
-	OpRemainHP: "RemainHP", OpDeath: "Death", OpContainer: "Container",
+	OpRemainHP: "RemainHP", OpDeath: "Death", OpKill: "Kill", OpContainer: "Container",
 	OpSelfStats: "SelfStats", OpPartyScope: "PartyScope",
 }
 

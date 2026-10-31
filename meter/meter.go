@@ -47,6 +47,12 @@ type Fight struct {
 	Total      uint64
 	Actors     map[uint32]*actorStats
 	Taken      map[uint32]uint64 // player -> damage this target dealt them
+	// From the target's spawn, when we saw it:
+	NPC      uint32
+	MaxHP    uint32
+	Boss     bool // spawned with a stagger gauge: a boss or miniboss
+	Killed   bool
+	KilledAt int64
 }
 
 type actorStats struct {
@@ -67,6 +73,7 @@ type Row struct {
 	Amount      uint64
 	DPS, Share  float64 // Share in %
 	Hits, Crits uint64
+	Deaths      int        // during this fight
 	Skills      []SkillRow // biggest first
 }
 
@@ -100,12 +107,20 @@ type Meter struct {
 	scope     map[uint32]uint32 // 06 38 records per entity
 	myClass   wire.Class
 	party     map[string]wire.Member // by name: rosters carry account ids, not entity ids
+	npcs      map[uint32]wire.Spawn
+	gone      map[uint32]bool // left the world (a spirit unsummoned)
+	deaths    []death
+}
+
+type death struct {
+	at     int64
+	entity uint32
 }
 
 // New takes the DoT skills whose damage ticks count. The rest of 05 38 damage
 // repeats what 04 38 already sent.
 func New(dotSkills map[uint32]bool) *Meter {
-	return &Meter{dotSkills: dotSkills, fights: map[uint32]*Fight{}, owners: map[uint32]uint32{}, players: map[uint32]bool{}, names: map[uint32]string{}, party: map[string]wire.Member{}, scope: map[uint32]uint32{}}
+	return &Meter{dotSkills: dotSkills, fights: map[uint32]*Fight{}, owners: map[uint32]uint32{}, players: map[uint32]bool{}, names: map[uint32]string{}, party: map[string]wire.Member{}, scope: map[uint32]uint32{}, npcs: map[uint32]wire.Spawn{}, gone: map[uint32]bool{}}
 }
 
 // Link records that summon belongs to owner (from a spawn or a spirit's link record).
@@ -184,6 +199,42 @@ func (m *Meter) PartyScope(id uint32) {
 	}
 }
 
+// Spawn records an NPC, summon or effect entering the world.
+func (m *Meter) Spawn(s wire.Spawn) {
+	m.npcs[s.Entity] = s
+	delete(m.gone, s.Entity)
+	delete(m.owners, s.Entity) // ids get reissued: whatever it was, it's this now
+	delete(m.players, s.Entity)
+	if s.Kind != wire.KindSummon {
+		return
+	}
+	if s.Owner != 0 {
+		m.Link(s.Entity, s.Owner)
+		return
+	}
+	if s.Name != "" { // the owner's name, when there's no parent_key
+		for id, name := range m.names {
+			if name == s.Name && id != s.Entity {
+				m.Link(s.Entity, id)
+				return
+			}
+		}
+	}
+}
+
+// Death: killed (flag 3) ends a fight; gone (flag 7) stops a spirit's ticks.
+func (m *Meter) Death(at int64, d wire.Death) {
+	switch d.Flag {
+	case wire.DeathKilled:
+		m.deaths = append(m.deaths, death{at, d.Entity})
+		if f := m.fights[d.Entity]; f != nil {
+			f.Killed, f.KilledAt = true, at
+		}
+	case wire.DeathGone:
+		m.gone[d.Entity] = true
+	}
+}
+
 // SetParty replaces the party with this roster's members.
 func (m *Meter) SetParty(r wire.Roster) {
 	m.party = map[string]wire.Member{}
@@ -244,6 +295,12 @@ func playerSkill(s uint32) bool {
 }
 
 func (m *Meter) Add(h Hit) {
+	if h.DoT && m.gone[h.Actor] { // the game doesn't count ticks from a spirit that left
+		return
+	}
+	if !h.DoT && !h.Heal {
+		delete(m.gone, h.Actor)
+	}
 	switch {
 	case h.Heal:
 		m.heals = append(m.heals, heal{h.At, m.Owner(h.Actor), h.Amount})
@@ -271,6 +328,9 @@ func (m *Meter) Add(h Hit) {
 	f := m.fights[h.Target]
 	if f == nil || h.At-f.End > IdleResetMS {
 		f = &Fight{Target: h.Target, Start: h.At, End: h.At, Actors: map[uint32]*actorStats{}, Taken: map[uint32]uint64{}}
+		if sp, ok := m.npcs[h.Target]; ok {
+			f.NPC, f.MaxHP, f.Boss = sp.NPC, sp.MaxHP, sp.Boss()
+		}
 		m.fights[h.Target] = f
 	}
 	f.Start, f.End = min(f.Start, h.At), max(f.End, h.At)
@@ -325,6 +385,11 @@ func (m *Meter) Rows(target uint32) []Row {
 	rows := make([]Row, 0, len(byOwner))
 	for o, r := range byOwner {
 		r.DPS = float64(r.Amount) / secs
+		for _, d := range m.deaths {
+			if d.entity == o && d.at >= f.Start && d.at <= max(f.End, f.KilledAt) {
+				r.Deaths++
+			}
+		}
 		if f.Total > 0 {
 			r.Share = float64(r.Amount) / float64(f.Total) * 100
 		}
@@ -359,7 +424,7 @@ func (m *Meter) HealRows(target uint32) []HealRow {
 	return rows
 }
 
-// Fights: every current fight long enough to count, biggest first.
+// Fights: every current fight long enough to count, bosses first, then biggest.
 func (m *Meter) Fights() []*Fight {
 	var out []*Fight
 	for _, f := range m.fights {
@@ -367,6 +432,18 @@ func (m *Meter) Fights() []*Fight {
 			out = append(out, f)
 		}
 	}
-	slices.SortFunc(out, func(a, b *Fight) int { return cmp.Or(cmp.Compare(b.Total, a.Total), cmp.Compare(a.Target, b.Target)) })
+	slices.SortFunc(out, func(a, b *Fight) int {
+		return cmp.Or(boolCmp(b.Boss, a.Boss), cmp.Compare(b.Total, a.Total), cmp.Compare(a.Target, b.Target))
+	})
 	return out
+}
+
+func boolCmp(a, b bool) int {
+	switch {
+	case a == b:
+		return 0
+	case a:
+		return 1
+	}
+	return -1
 }

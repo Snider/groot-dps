@@ -39,7 +39,10 @@ We borrow the protocol knowledge only and write our own Go. No code copied.
 | `0x9702` | Party info | who's in the static |
 | `0x3641` | Mob summon/spawn | target names (boss vs trash) |
 | `0x8D00` | Remaining HP | boss HP % |
-| `0x8D04` | Entity death | fight end, **kill events → drop DB** |
+| `0x8D04` | Kill / summon ownership | names who got the kill → **drop DB** |
+| `0x3642` | Death | flag 1 loaded dead, 3 killed, 7 gone |
+| `0x364A` | Own stats | about you only: finds you without a zone load |
+| `0x3806` | Party scope | about you (+ party in older regions), several a second |
 
 ## Damage packet (`0x3804`)
 Source of truth: A2Tools (`src-tauri/src/capture/stream_processor.rs`, `parsing_damage_inner`), checked against the game's own Damage Analyzer. Golden records in `wire/damage_golden_test.go`. All varints are at most 5 bytes and never past int32.
@@ -98,6 +101,23 @@ Golden records in `wire/names_golden_test.go` (names scrubbed).
    - The width varies, so find the world u16 within 10 bytes. Failing that (a visitor), find any world 1000-2999 with a tag 1-4 and a power 1..100M after it.
    - The next member is re-found by header: the next slot, a world in the account's top u16, a valid name, within 32 bytes. A vacant slot is `00 <slot>` + zero account + empty name; past one, look up to 48 bytes per slot for a later member.
 - Not ported: party left (A2Tools `parse_party_left_packet`), other parties' rosters (`is_other_party`), `06 38` party scope.
+
+## Spawn (`41 36`, `40 36` before June 2026)
+NPCs, summons/pets and skill effects, never real players. Golden spawns in `wire/spawn_golden_test.go`.
+1. `entity` varint
+2. `mask` u32 (u16 in older builds). Low byte = kind: `0C`/`0D` NPC, `5F` summon/pet, `1C` skill effect (parented to the skill's **target**; its name is the caster's), `1F`/`1D`/`5D` spirits and lingering ground spells.
+3. The name-gate byte: at +4 (u32 mask) or +2 (u16 mask), try both. Bit 0 set = `len` u8 + a name: a summon's owner, an effect's caster.
+4. The rest is three variable subtrees, so fields are found by landmarks:
+   - **NPC code:** the 3 bytes before `00 (00|40) 02`, within 60 bytes of the mask.
+   - **HP:** within 64 bytes after that, `01 <hp varint> <maxHP varint>` with max ≥ hp > 0.
+   - **Stagger gauge:** the record ends `03 01 <max u32> <current u32> <4 bytes> 00`. **Only bosses and minibosses have one** (3 of 129 spawns in A2Tools' 2026-10-22 capture, no false match). That's our boss flag, no NPC table needed.
+   - **Owner** (kind `5F`, mask bit `0x10`): after a `06` byte, `<owner u32> <legion u32> <u16 0> <world u16> <len u8> <legion name>`.
+- Not ported: A2Tools' spirit-owner fallbacks (buff block anchor `80 75 D5 2A BB 03 00 00`, effect caster after `07 02 06`), `NpcLookup` boss/dummy tables, the old id remap for ids over 1M.
+
+## Death (`42 36`)
+`entity` varint, varint (always 0), `flag` varint: 1 = already dead when the zone loaded, 3 = killed, 7 = gone from the world (only trust 7 under `42 36`). The game doesn't count a spirit's ticks after it's gone; a direct hit means the id is back.
+
+(Kuroukihime's `0x8D04` "death" is really A2Tools' kill/ownership record: `04 8D <mob> <4 bytes> <owner> <server> <name> <server name>`. It names who got the kill, so it matters for the drop DB.)
 
 ## From A2Tools' plugin decoders
 Plugins (github.com/taengu/A2Tools-Plugins, GPL-3, read at `24aaf21`, cloned in `ref/`) declare the frames they want in `manifest.json`: opcode bytes as on the wire, then fields in order (numbers only, `skip:N` = unknown bytes). `self=x` means the meter only passes it on when field `x` is your own character. **Unverified by us**: plugin authors' readings, not golden-tested. Promote a row to a decoder only with a real record.

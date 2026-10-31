@@ -19,7 +19,7 @@ Some meters only learn which character is yours when you load a zone, so you tel
 You show up marked as you straight away. Your name fills in at the next zone load, when the game sends your full character record. (These rules come from A2Tools' captures. We'll verify them on our own once the live meter runs.)
 
 ## Status
-The decoders and the maths are done and tested against real game records: damage, DoT/heal ticks, names and party. Still to come: spawns (boss vs trash), deaths, and the live Windows window. Until then `grootdump` runs a capture through the meter.
+The decoders and the maths are done and tested against real game records: damage, DoT/heal ticks, names, party, spawns (bosses spot themselves by their stagger gauge, pets find their owners) and deaths. Still to come: the live Windows window. Until then `grootdump` runs a capture through the meter.
 
 ## Layout
 - `wire/`: game stream → packets (framing, LZ4 bundles) and decoders (damage, ticks, identities, party roster)
