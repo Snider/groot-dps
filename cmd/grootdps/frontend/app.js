@@ -28,7 +28,12 @@ function row(r, top) {
   }
   const num = document.createElement('span');
   num.className = 'num';
-  num.textContent = `${short(r.perSec)}  ${short(r.amount)}`;
+  const rate = document.createElement('b');
+  rate.textContent = short(r.perSec);
+  const total = document.createElement('span');
+  total.className = 'total';
+  total.textContent = short(r.amount);
+  num.append(rate, total);
   const pct = document.createElement('span');
   pct.className = 'pct';
   pct.textContent = r.share ? r.share.toFixed(1) + '%' : '';
@@ -52,8 +57,10 @@ function draw(s) {
       b.textContent = 'Boss ';
       title.append(b);
     }
-    title.append(f.killed ? 'killed' : (f.boss ? '' : 'Fight'));
-    $('meta').textContent = `${clock(f.seconds)} · ${short(f.total)}`;
+    if (f.killed) title.append('down');
+    else if (!f.boss) title.append('Fight');
+    const left = f.maxHp && !f.killed ? ` · ${Math.max(0, 100 - (f.total / f.maxHp) * 100).toFixed(0)}% left` : '';
+    $('meta').textContent = `${clock(f.seconds)} · ${short(f.total)}${left}`;
     const list = (mode === 'dps' ? f.rows : f.heals) || [];
     const top = list.reduce((m, r) => Math.max(m, r.amount), 0);
     rows.replaceChildren(...list.map((r) => row(r, top)));

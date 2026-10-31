@@ -24,7 +24,9 @@ button:hover { color: var(--text); background: rgba(255,255,255,0.08); }
 .row .name { flex: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .row.you .name { color: var(--you); font-weight: 600; }
 .row.stranger { opacity: 0.6; }
-.row .num { font-variant-numeric: tabular-nums; color: var(--text); }
+.row .num { font-variant-numeric: tabular-nums; color: var(--text); display: flex; gap: 6px; align-items: baseline; }
+.row .num b { font-weight: 600; min-width: 44px; text-align: right; }
+.row .num .total { color: var(--dim); font-size: 11px; min-width: 44px; text-align: right; }
 .row .pct { width: 42px; text-align: right; color: var(--dim); font-variant-numeric: tabular-nums; }
 .row .dead { color: #e07a7a; }
 .status { padding: 3px 8px; color: var(--dim); font-size: 11px; border-top: 1px solid rgba(255,255,255,0.06); }
