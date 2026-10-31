@@ -94,7 +94,10 @@ type Meter struct {
 	players   map[uint32]bool
 	heals     []heal
 	names     map[uint32]string
-	me        uint32 // 0 until a self record arrives
+	me        uint32 // 0 until we know which entity is you
+	meFrom    source
+	streak    struct{ id, n uint32 }
+	scope     map[uint32]uint32 // 06 38 records per entity
 	myClass   wire.Class
 	party     map[string]wire.Member // by name: rosters carry account ids, not entity ids
 }
@@ -102,7 +105,7 @@ type Meter struct {
 // New takes the DoT skills whose damage ticks count. The rest of 05 38 damage
 // repeats what 04 38 already sent.
 func New(dotSkills map[uint32]bool) *Meter {
-	return &Meter{dotSkills: dotSkills, fights: map[uint32]*Fight{}, owners: map[uint32]uint32{}, players: map[uint32]bool{}, names: map[uint32]string{}, party: map[string]wire.Member{}}
+	return &Meter{dotSkills: dotSkills, fights: map[uint32]*Fight{}, owners: map[uint32]uint32{}, players: map[uint32]bool{}, names: map[uint32]string{}, party: map[string]wire.Member{}, scope: map[uint32]uint32{}}
 }
 
 // Link records that summon belongs to owner (from a spawn or a spirit's link record).
@@ -119,10 +122,65 @@ func (m *Meter) Identify(id wire.Identity) {
 	m.players[id.Entity] = true
 	delete(m.owners, id.Entity)
 	if id.Self {
-		m.me, m.myClass = id.Entity, id.Class
+		m.me, m.meFrom, m.myClass = id.Entity, fromRecord, id.Class
 	}
 	if id.Name != "" {
 		m.names[id.Entity] = id.Name
+	}
+}
+
+// How we know which entity is you, weakest first.
+type source uint8
+
+const (
+	unknown source = iota
+	fromScope
+	fromRecord
+	fromStats
+)
+
+// Me is your entity id, 0 until something told us.
+func (m *Meter) Me() uint32 { return m.me }
+
+// SelfStats: a 4A 36 record, about your own stats only. Three in a row naming
+// one entity make it you, even over a self record (which goes stale when a
+// zone load's copy is missed).
+func (m *Meter) SelfStats(id uint32) {
+	if id == m.me {
+		m.streak.n = 0
+		return
+	}
+	if m.streak.id != id {
+		m.streak.id, m.streak.n = id, 0
+	}
+	if m.streak.n++; m.streak.n >= 3 {
+		m.me, m.meFrom, m.streak.n = id, fromStats, 0
+	}
+}
+
+// PartyScope: a 06 38 record. Until a self record or own stats say otherwise,
+// you are the player they name far more than anyone (24+, and 4x the next).
+func (m *Meter) PartyScope(id uint32) {
+	if id < 100 || len(m.scope) >= 10_000 && m.scope[id] == 0 {
+		return
+	}
+	m.scope[id]++
+	if m.scope[id]%8 != 0 || m.meFrom > fromScope {
+		return
+	}
+	var best, top, second uint32
+	for e, n := range m.scope {
+		if _, summon := m.owners[e]; !m.players[e] || summon {
+			continue
+		}
+		if n > top {
+			best, top, second = e, n, top
+		} else {
+			second = max(second, n)
+		}
+	}
+	if top >= 24 && top >= 4*max(second, 1) {
+		m.me, m.meFrom = best, fromScope
 	}
 }
 

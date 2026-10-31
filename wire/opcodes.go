@@ -22,6 +22,8 @@ const (
 	OpMobSpawn     uint16 = 0x3641
 	OpRemainHP     uint16 = 0x8D00
 	OpDeath        uint16 = 0x8D04
+	OpSelfStats    uint16 = 0x364A // about your own stats only
+	OpPartyScope   uint16 = 0x3806 // about you (and party, in older regions), several a second
 	OpContainer    uint16 = 0xFFFF // LZ4 block of more frames
 )
 
@@ -36,4 +38,17 @@ var opNames = map[uint16]string{
 	OpPlayerInfo: "PlayerInfo", OpOtherPlayers: "OtherPlayers", OpIDLink: "IDLink",
 	OpPlayerStats: "PlayerStats", OpPartyInfo: "PartyInfo", OpMobSpawn: "MobSpawn",
 	OpRemainHP: "RemainHP", OpDeath: "Death", OpContainer: "Container",
+	OpSelfStats: "SelfStats", OpPartyScope: "PartyScope",
+}
+
+// EntityOf reads the entity id that a 4A 36 or 06 38 record opens with.
+func EntityOf(p []byte) (uint32, bool) {
+	op, ok := Opcode(p)
+	if !ok || op != OpSelfStats && op != OpPartyScope {
+		return 0, false
+	}
+	_, n := uvarint(p)
+	r := reader{b: p[n+2:]}
+	id := r.varint32()
+	return id, r.err == nil && id >= 100 && id <= 9_999_999
 }

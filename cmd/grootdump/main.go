@@ -278,6 +278,14 @@ func feedMeter(m *meter.Meter, at int64, op uint16, p []byte) {
 		if id, err := wire.ParseIdentity(p); err == nil {
 			m.Identify(id)
 		}
+	case wire.OpSelfStats:
+		if id, ok := wire.EntityOf(p); ok {
+			m.SelfStats(id)
+		}
+	case wire.OpPartyScope:
+		if id, ok := wire.EntityOf(p); ok {
+			m.PartyScope(id)
+		}
 	case wire.OpPartyInfo:
 		if r, err := wire.ParseRoster(p); err == nil {
 			m.SetParty(r)
