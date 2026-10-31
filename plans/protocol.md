@@ -64,5 +64,36 @@ After length + opcode:
 
 Not ported yet: chained records (`01 00` then another record), the `03 00` heal suffix, A2Tools' fallback tail heuristics, and their compact skill `99745942`.
 
+## From A2Tools' plugin decoders
+Plugins (github.com/taengu/A2Tools-Plugins, GPL-3, read at `24aaf21`, cloned in `ref/`) declare the frames they want in `manifest.json`: opcode bytes as on the wire, then fields in order (numbers only, `skip:N` = unknown bytes). `self=x` means the meter only passes it on when field `x` is your own character. **Unverified by us**: plugin authors' readings, not golden-tested. Promote a row to a decoder only with a real record.
+
+| Wire bytes | Plugin / event | Fields |
+|---|---|---|
+| `00 90` | pet-souls/pet-list | skip:4, levels[varint](pet:u32, skip:4, level:u32), points[varint](pet:u32, points:u32) |
+| `01 38` | cooldowns/skill-used (immediate=True) | skip:3, skill:u32 |
+| `02 38` | boss-telegraph/boss-skill (immediate=True) | caster:varint, skip:1, skill:u32 |
+| `03 38` | boss-telegraph/boss-wave (immediate=True) | caster:varint, skip:1, source:varint, skill:u32 |
+| `04 38` | mantra-watch/my-hit (self=actor immediate=True) | target:varint, flags:varint, x:varint, actor:varint, skill:u32 |
+| `09 38` | boss-telegraph/boss-cast (immediate=True) | caster:varint, skip:1, skill:u32 |
+| `0D 90` | pet-souls/soul-gained (immediate=True) | souls[u8](pet:u32, amount:u32) |
+| `14 90` | pet-souls/level-up (immediate=True) | skip:2, pet:u32, level:u32 |
+| `1B 92` | heal-alert/party-hp (immediate=True) | member:varint, hp:varint, max:varint |
+| `21 36` | mantra-watch/map-load (immediate=True) | (match only) |
+| `21 36` | pet-souls/map-load | skip:4, map:u32, skip:8, x:u32, y:u32, z:u32 |
+| `23 36` | mantra-watch/landed (immediate=True) | (match only) |
+| `23 36` | pet-souls/teleport | flag:u8, skip:5, x:u32, y:u32, z:u32 |
+| `2A 38` | boss-telegraph/boss-buff-added (immediate=True) | entity:varint, skip:1, flags:u8, instance:varint, abnormal:u32, length:u64 |
+| `2A 38` | cooldowns/buff-added (self=entity immediate=True) | entity:varint, skip:1, flags:u8, instance:varint, abnormal:u32, length:u64, end:u64, caster:varint, level:u8, skill:u32 |
+| `2A 38` | pet-souls/own-position (self=source) | source:varint, one:u8, kind:u8, seq:varint, skip:20, target:varint, p:u8, q:u8, x:u32, y:u32, z:u32 |
+| `2B 38` | cooldowns/buff-changed (self=entity immediate=True) | entity:varint, flags:u8, instance:varint, abnormal:u32, length:u64, end:u64 |
+| `2B 38` | mantra-watch/mantra-tick (self=caster immediate=True) | on:varint, kind:u8, seq:varint, effect:u32, skip:16, caster:varint, p:u8, skill:u32, q:u8 |
+| `2B 38` | pet-souls/mantra-tick (self=source) | source:varint, kind:u8, seq:varint, skip:20, target:varint, p:u8, skip:4, q:u8, x:u32, y:u32, z:u32 |
+| `2C 38` | boss-telegraph/boss-buff-removed (immediate=True), cooldowns/buff-removed (self=entity immediate=True) | entity:varint, count:u8, kind:u8, instance:varint |
+| `41 36` | pet-souls/npc-spawn | entity:varint, skip:3, npc:u32, skip:2, x:u32, y:u32, z:u32 |
+| `42 36` | pet-souls/npc-gone | entity:varint |
+| `47 38` | cooldowns/cooldowns (immediate=True) | skills[u8](group:u32, ms:varint) |
+
+Handy for us: `1B 92` party HP (a heal alert for the cleric), `41 36` / `42 36` spawn and despawn with position, `21 36` map load (zone changes reissue entity ids), `09 38` / `02 38` boss casts and skills (mechanic callouts).
+
 ## Not covered by the reference
 - **Loot / item drops: no opcode known.** That one is ours to find. Capture with a kill and a loot pickup in it, then diff.
