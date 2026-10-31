@@ -7,6 +7,8 @@ import (
 	"encoding/hex"
 	"testing"
 	"time"
+
+	"groot/dps/meter"
 )
 
 var keepalive = []byte{0x0E, 0x00, 0x36, 0, 0, 0, 0, 0, 0, 0, 0}
@@ -89,4 +91,30 @@ func TestResetClearsTheFight(t *testing.T) {
 	if s := p.Snapshot(); s.Fight != nil {
 		t.Fatalf("snapshot %+v", s)
 	}
+}
+
+// A long session stays small: old fights get pruned as segments arrive.
+func TestLongSessionsArePruned(t *testing.T) {
+	p := New(nil)
+	t0 := time.UnixMilli(0)
+	seq := uint32(1)
+	push := func(at time.Time, b []byte) {
+		p.Segment(at, "game", seq, b)
+		seq += uint32(len(b))
+	}
+	push(t0, keepalive)
+	for i := range 120 { // a mob a minute for two hours
+		push(t0.Add(time.Duration(i)*time.Minute), hitRec(uint64(60_000+i), grooty, 17_050_240, 10))
+	}
+	p.With(func(m *meter.Meter) {
+		kept := 0
+		for i := range 120 {
+			if m.Fight(uint32(60_000+i)) != nil {
+				kept++
+			}
+		}
+		if kept > meter.KeepMS/60_000+2 {
+			t.Errorf("%d of 120 fights kept", kept)
+		}
+	})
 }

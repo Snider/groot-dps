@@ -13,7 +13,10 @@ import (
 	"groot/dps/wire"
 )
 
-const maxFlows = 64
+const (
+	maxFlows   = 64
+	pruneEvery = 30 * time.Second
+)
 
 type flow struct {
 	stream tcp.Stream
@@ -27,6 +30,7 @@ type Pipeline struct {
 	m       *meter.Meter
 	flows   map[string]*flow
 	packets int
+	pruned  time.Time
 }
 
 func New(dotSkills map[uint32]bool) *Pipeline {
@@ -56,6 +60,10 @@ func (p *Pipeline) Segment(at time.Time, flowKey string, seq uint32, payload []b
 			p.packets++
 			Dispatch(p.m, at.UnixMilli(), pk)
 		}
+	}
+	if at.Sub(p.pruned) >= pruneEvery {
+		p.m.Prune(at.UnixMilli())
+		p.pruned = at
 	}
 }
 

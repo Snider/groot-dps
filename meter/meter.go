@@ -231,7 +231,10 @@ func (m *Meter) Death(at int64, d wire.Death) {
 			f.Killed, f.KilledAt = true, at
 		}
 	case wire.DeathGone:
-		m.gone[d.Entity] = true
+		delete(m.npcs, d.Entity)
+		if _, summon := m.owners[d.Entity]; summon { // only a summon's ticks linger
+			m.gone[d.Entity] = true
+		}
 	}
 }
 
