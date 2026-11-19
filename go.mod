@@ -3,6 +3,7 @@ module groot/dps
 go 1.26.5
 
 require (
+	github.com/dappcore/go v0.15.0
 	github.com/google/gopacket v1.1.19
 	github.com/pierrec/lz4/v4 v4.1.33
 	github.com/wailsapp/wails/v3 v3.0.0
@@ -11,7 +12,6 @@ require (
 require (
 	github.com/adrg/xdg v0.5.3 // indirect
 	github.com/coder/websocket v1.8.14 // indirect
-	github.com/dappcore/go v0.14.0 // indirect
 	github.com/go-ole/go-ole v1.3.0 // indirect
 	github.com/godbus/dbus/v5 v5.2.2 // indirect
 	github.com/mattn/go-colorable v0.1.14 // indirect
