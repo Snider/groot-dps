@@ -13,7 +13,16 @@ Because a meter sees everything you and everyone around you do, and you should b
 ## Your fights, on your disk
 When a fight you were in ends (killed, or quiet for 30s), the meter saves what it showed as a JSON file in your own folder: `%AppData%\GrootDPS\fights\<day>\<time> boss <npc> killed.json`. 📁 in the window opens it. Days older than 30 are deleted on their own.
 
-It's yours: read it, keep it, delete it. Nothing reads it but you. `-keep-days 7` keeps a week, `-keep-days 0` saves nothing, and `-history <folder>` puts it somewhere else.
+It's yours: read it, keep it, delete it. Nothing reads it but you.
+
+Settings live next to it in `%AppData%\GrootDPS\settings.yaml`, and the window opens where you last left it:
+```
+grootdps settings                      # what's set, and where the file is
+grootdps set history.keep_days 7       # keep a week (0: save nothing)
+grootdps set history.dir D:\fights     # put fights somewhere else
+grootdps set meter.dots D:\dots.json   # the DoT allowlist
+```
+A flag (`-keep-days 7`, `-history <folder>`, `-dots <file>`, `-x`/`-y`) changes it for one run only. So does an environment variable such as `GROOTDPS_HISTORY_KEEP_DAYS=7`, which is never written to the file.
 
 From a terminal, no window:
 ```

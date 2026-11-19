@@ -26,6 +26,7 @@ import (
 
 	core "github.com/dappcore/go"
 	"github.com/wailsapp/wails/v3/pkg/application"
+	"github.com/wailsapp/wails/v3/pkg/events"
 
 	"groot/dps/history"
 	"groot/dps/live"
@@ -45,13 +46,15 @@ func main() {
 		}
 		return
 	}
+	prefs := openSettings()
+	saved := prefs.Values() // flags default to the settings file; a flag given wins for this run
 	replay := flag.String("replay", "", "play a .pcapng/.pcap instead of capturing live")
 	fast := flag.Bool("fast", false, "with -replay: as fast as it reads, not at the capture's pace")
-	dotsFile := flag.String("dots", "", "JSON list of DoT skill ids whose damage ticks count")
-	keepDays := flag.Int("keep-days", 30, "keep finished fights on disk this many days (0: don't save them)")
-	historyDir := flag.String("history", defaultHistory(), "where finished fights are saved")
-	x := flag.Int("x", 40, "window position, from the screen's left")
-	y := flag.Int("y", 120, "window position, from the screen's top")
+	dotsFile := flag.String("dots", saved.Dots, "JSON list of DoT skill ids whose damage ticks count")
+	keepDays := flag.Int("keep-days", saved.KeepDays, "keep finished fights on disk this many days (0: don't save them)")
+	historyDir := flag.String("history", saved.HistoryDir, "where finished fights are saved")
+	x := flag.Int("x", saved.WindowX, "window position, from the screen's left")
+	y := flag.Int("y", saved.WindowY, "window position, from the screen's top")
 	flag.Parse()
 
 	c := core.New(
@@ -73,7 +76,7 @@ func main() {
 		Mac:         application.MacOptions{ApplicationShouldTerminateAfterLastWindowClosed: true},
 		Windows:     application.WindowsOptions{},
 	})
-	app.Window.NewWithOptions(application.WebviewWindowOptions{
+	win := app.Window.NewWithOptions(application.WebviewWindowOptions{
 		Title:           "Groot DPS",
 		Width:           380,
 		Height:          300,
@@ -87,6 +90,13 @@ func main() {
 		X:               *x,
 		Y:               *y,
 		URL:             "/",
+	})
+	win.RegisterHook(events.Common.WindowClosing, func(*application.WindowEvent) {
+		if x, y := win.Position(); x != saved.WindowX || y != saved.WindowY {
+			if r := prefs.SaveWindow(x, y); !r.OK { // opens where you left it next time
+				log.Printf("settings: %s", r.Error())
+			}
+		}
 	})
 	err := app.Run()
 	c.ServiceShutdown(core.Background()) // saves a fight still going when the window closed
@@ -152,13 +162,4 @@ func loadDots(path string) map[uint32]bool {
 		dots[id] = true
 	}
 	return dots
-}
-
-// defaultHistory: %AppData%\GrootDPS\fights on Windows (the OS's per-user config folder elsewhere).
-func defaultHistory() string {
-	dir, err := os.UserConfigDir()
-	if err != nil {
-		return ""
-	}
-	return filepath.Join(dir, "GrootDPS", "fights")
 }

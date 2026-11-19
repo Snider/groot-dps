@@ -56,3 +56,23 @@ func TestCommands_Ugly(t *testing.T) {
 		t.Fatal("fights not a command")
 	}
 }
+
+// set writes the settings file, settings reads it back; bad input changes nothing.
+func TestCommands_SetThenSettings_Good(t *testing.T) {
+	home := t.TempDir()
+	t.Setenv("HOME", home)
+	t.Setenv("APPDATA", home) // Windows
+	t.Setenv("XDG_CONFIG_HOME", home)
+	if out, ok := run(t, "set", "history.keep_days", "7"); !ok || !strings.Contains(out, "history.keep_days  7") {
+		t.Fatalf("set: ok=%v\n%s", ok, out)
+	}
+	if _, ok := run(t, "set", "history.keep_days", "lots"); ok {
+		t.Fatal("set accepted lots")
+	}
+	if _, ok := run(t, "set", "history.keep_days"); ok {
+		t.Fatal("set with no value succeeded")
+	}
+	if out, _ := run(t, "settings"); !strings.Contains(out, "history.keep_days  7") || !strings.Contains(out, home) {
+		t.Fatalf("settings:\n%s", out)
+	}
+}

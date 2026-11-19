@@ -4,6 +4,7 @@ package main
 
 import (
 	"io"
+	"log"
 	"os"
 	"strconv"
 
@@ -11,6 +12,7 @@ import (
 
 	"groot/dps/history"
 	"groot/dps/live"
+	"groot/dps/settings"
 	"groot/dps/source"
 )
 
@@ -21,8 +23,10 @@ import (
 //	grootdps replay fight.pcapng --save     # and save them to history
 //	grootdps fights                         # the last 10 saved fights
 //	grootdps fights 3 --history=D:\fights   # the last 3, from another folder
+//	grootdps settings                       # what's set, and where the file is
+//	grootdps set history.keep_days 7        # change one, for good
 //
-// Every command also takes --dots=<file> (replay) and --history=<dir>.
+// --dots and --history override the settings file for one run.
 func commands(out io.Writer) *core.Core {
 	c := core.New(core.WithOption("name", "grootdps"), core.WithCli())
 	c.Command("replay", core.Command{Description: "play a capture without the window", Action: func(o core.Options) core.Result {
@@ -30,6 +34,20 @@ func commands(out io.Writer) *core.Core {
 	}})
 	c.Command("fights", core.Command{Description: "list saved fights, newest first", Action: func(o core.Options) core.Result {
 		return fights(out, o)
+	}})
+	c.Command("settings", core.Command{Description: "show your settings and where they're kept", Action: func(core.Options) core.Result {
+		return showSettings(out, openSettings())
+	}})
+	c.Command("set", core.Command{Description: "change a setting: grootdps set history.keep_days 7", Action: func(o core.Options) core.Result {
+		args := o.Args()
+		if len(args) != 2 {
+			return core.Fail(core.E("grootdps.set", "set <key> <value>, keys: "+core.Join(", ", settings.Keys...), nil))
+		}
+		s := openSettings()
+		if r := s.Set(args[0], args[1]); !r.OK {
+			return r
+		}
+		return showSettings(out, s)
 	}})
 	return c
 }
@@ -56,7 +74,7 @@ func replay(out io.Writer, o core.Options) core.Result {
 	}
 	n := 0
 	c := core.New(
-		core.WithService(source.Register(source.Options{Dots: loadDots(o.String("dots")), Replay: file, Fast: !o.Bool("pace")})),
+		core.WithService(source.Register(source.Options{Dots: loadDots(dotsFile(o)), Replay: file, Fast: !o.Bool("pace")})),
 		core.WithService(history.Register(history.Options{Dir: historyDir(o), KeepDays: keep})),
 		core.WithServiceLock(),
 	)
@@ -105,5 +123,42 @@ func historyDir(o core.Options) string {
 	if d := o.String("history"); d != "" {
 		return d
 	}
-	return defaultHistory()
+	return openSettings().Values().HistoryDir
+}
+
+func dotsFile(o core.Options) string {
+	if d := o.String("dots"); d != "" {
+		return d
+	}
+	return openSettings().Values().Dots
+}
+
+// openSettings opens the settings file. A broken one is reported and
+// replaced by the defaults for this run, so the meter still opens.
+func openSettings() *settings.Store {
+	r := settings.Open(settings.DefaultPath())
+	if !r.OK {
+		log.Printf("settings: %s (using defaults)", r.Error())
+		r = settings.Open(core.Path(core.TempDir(), "grootdps-defaults", "settings.yaml"))
+	}
+	return r.Value.(*settings.Store)
+}
+
+func showSettings(out io.Writer, s *settings.Store) core.Result {
+	v := s.Values()
+	io.WriteString(out, core.Sprintf(`%s
+  history.keep_days  %d
+  history.dir        %s
+  meter.dots         %s
+  window.x           %d
+  window.y           %d
+`, s.Path(), v.KeepDays, v.HistoryDir, orNext(v.Dots), v.WindowX, v.WindowY))
+	return core.Ok(nil)
+}
+
+func orNext(dots string) string {
+	if dots == "" {
+		return "(dot_skill_ids.json next to the program)"
+	}
+	return dots
 }
