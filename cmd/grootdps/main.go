@@ -13,23 +13,21 @@
 package main
 
 import (
-	"context"
 	"embed"
 	"encoding/json"
 	"flag"
-	"fmt"
 	"log"
 	"net/http"
 	"os"
 	"path/filepath"
 	"sync"
-	"time"
 
+	core "github.com/dappcore/go"
 	"github.com/wailsapp/wails/v3/pkg/application"
 
-	"groot/dps/capture"
 	"groot/dps/history"
 	"groot/dps/live"
+	"groot/dps/source"
 )
 
 //go:embed frontend
@@ -45,40 +43,22 @@ func main() {
 	y := flag.Int("y", 120, "window position, from the screen's top")
 	flag.Parse()
 
-	pipe := live.New(loadDots(*dotsFile))
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
-	store := history.Store{}
-	if *keepDays > 0 {
-		store.Dir = *historyDir
-		queue := make(chan record, 64)
-		pipe.OnFinished = func(at time.Time, v live.FightView) { // before capture starts: no race
-			select {
-			case queue <- record{at, v}:
-			default:
-				log.Printf("history: queue full, a fight wasn't saved")
-			}
-		}
-		go keepHistory(ctx, queue, store, *keepDays)
+	c := core.New(
+		core.WithOption("name", "grootdps"),
+		core.WithService(source.Register(source.Options{Dots: loadDots(*dotsFile), Replay: *replay, Fast: *fast})),
+		core.WithService(history.Register(history.Options{Dir: *historyDir, KeepDays: *keepDays})), // after source: stops after its last flush
+		core.WithServiceLock(),
+	)
+	if r := c.ServiceStartup(c.Context(), nil); !r.OK {
+		log.Fatal(r.Error())
 	}
-	go func() {
-		var err error
-		if *replay != "" {
-			err = capture.Replay(ctx, *replay, !*fast, pipe.Segment)
-			pipe.Flush(time.Now()) // the file's over: so are its fights
-			log.Printf("replay finished: %d packets", pipe.Snapshot().Packets)
-		} else {
-			err = capture.Live(ctx, pipe.Segment, log.Printf)
-		}
-		if err != nil {
-			log.Printf("capture: %v", err)
-		}
-	}()
+	src := core.MustServiceFor[*source.Service](c, "source")
+	hist := core.MustServiceFor[*history.Service](c, "history")
 
 	app := application.New(application.Options{
 		Name:        "Groot DPS",
 		Description: "A DPS meter for Aion 2 that only listens",
-		Assets:      application.AssetOptions{Handler: api(pipe, store, frontend)},
+		Assets:      application.AssetOptions{Handler: api(src.Pipe, hist.Store, frontend)},
 		Mac:         application.MacOptions{ApplicationShouldTerminateAfterLastWindowClosed: true},
 		Windows:     application.WindowsOptions{},
 	})
@@ -98,8 +78,7 @@ func main() {
 		URL:             "/",
 	})
 	err := app.Run()
-	pipe.Flush(time.Now())             // a fight still going when the window closed
-	time.Sleep(200 * time.Millisecond) // let the writer finish it
+	c.ServiceShutdown(core.Background()) // saves a fight still going when the window closed
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -171,58 +150,4 @@ func defaultHistory() string {
 		return ""
 	}
 	return filepath.Join(dir, "GrootDPS", "fights")
-}
-
-// record is what a saved fight file holds.
-type record struct {
-	At    time.Time      `json:"at"`
-	Fight live.FightView `json:"fight"`
-}
-
-func (r record) label() string {
-	label := fmt.Sprintf("fight %d", r.Fight.NPC)
-	if r.Fight.Boss {
-		label = fmt.Sprintf("boss %d", r.Fight.NPC)
-	}
-	if r.Fight.Killed {
-		label += " killed"
-	}
-	return label
-}
-
-// keepHistory saves finished fights (off the capture path, through a queue)
-// and clears out old days at start and once a day.
-func keepHistory(ctx context.Context, queue <-chan record, store history.Store, keepDays int) {
-	save := func(r record) {
-		if _, err := store.Save(r.At, r.label(), r); err != nil {
-			log.Printf("history: %v", err)
-		}
-	}
-	clean := func() {
-		if n, err := store.Cleanup(time.Now(), keepDays); err != nil {
-			log.Printf("history cleanup: %v", err)
-		} else if n > 0 {
-			log.Printf("history: cleared %d old days", n)
-		}
-	}
-	clean()
-	daily := time.NewTicker(24 * time.Hour)
-	defer daily.Stop()
-	for {
-		select {
-		case r := <-queue:
-			save(r)
-		case <-daily.C:
-			clean()
-		case <-ctx.Done():
-			for { // drain what's queued, then stop
-				select {
-				case r := <-queue:
-					save(r)
-				default:
-					return
-				}
-			}
-		}
-	}
 }

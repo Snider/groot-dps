@@ -30,7 +30,8 @@
 
 ## This project
 - Goal: a DPS meter for Aion 2.
-- Built on Snider's own Go native app framework (CoreGO at `~/Code/core`, already attached to the session; no `/add-dir` needed). No DPS code exists yet.
+- Built on CoreGO (`github.com/dappcore/*`, Snider's framework) as ordinary tagged deps: GrootDPS is its first simple real consumer. The app is a `core.New(...)` composition in `cmd/grootdps`: `source` (capture → pipeline) and `history` (saves fights) are Core services, and finished fights cross the Core bus as `live.FightFinished`. New features become services on the bus, not callbacks.
+- Pull in a CoreGO package only when it does a job we have (spec: `~/Lethean/agent/cladius/plans/project/snider/grootdps/RFC.md` maps jobs to packages). If a CoreGO package is awkward or broken, that's a CoreGO bug to fix there, not a shim here. core/go has no third-party deps and cross-builds for Windows without cgo, so it keeps "few dependencies" honest.
 - Why: the static wants a meter, and Snider building it means friends can trust what they run. So: open source, readable, no telemetry, nothing sneaky. Trust is the feature.
 - Ideas and next steps go in `plans/`.
 
