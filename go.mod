@@ -3,7 +3,7 @@ module groot/dps
 go 1.26.5
 
 require (
-	github.com/dappcore/config/go v0.19.0
+	github.com/dappcore/config/go v0.20.0
 	github.com/dappcore/go v0.17.0
 	github.com/google/gopacket v1.1.19
 	github.com/pierrec/lz4/v4 v4.1.33
@@ -34,5 +34,4 @@ require (
 	golang.org/x/net v0.60.0 // indirect
 	golang.org/x/sys v0.48.0 // indirect
 	golang.org/x/text v0.42.0 // indirect
-	gopkg.in/yaml.v3 v3.0.1 // indirect
 )
