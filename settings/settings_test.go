@@ -76,3 +76,23 @@ func TestSettings_Values_Ugly_EnvOverridesNotSaved(t *testing.T) {
 		t.Fatalf("env leaked into the file:\n%s", b)
 	}
 }
+
+// A settings file that can't be read: defaults from memory, and nothing is
+// ever written (no fallback file anywhere another user could plant).
+func TestSettings_Defaults_Ugly_BrokenFile(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "settings.yaml")
+	os.WriteFile(path, []byte("history: [not: a: map"), 0o600)
+	if r := Open(path); r.OK {
+		t.Fatal("a broken file opened")
+	}
+	s := Defaults()
+	if v := s.Values(); v.KeepDays != 30 || v.WindowX != 40 || s.Path() != "" {
+		t.Fatalf("%+v %q", v, s.Path())
+	}
+	if s.Set("history.keep_days", "7").OK || s.SaveWindow(1, 2).OK {
+		t.Fatal("Defaults wrote something")
+	}
+	if b, _ := os.ReadFile(path); string(b) != "history: [not: a: map" {
+		t.Fatalf("broken file changed: %q", b)
+	}
+}

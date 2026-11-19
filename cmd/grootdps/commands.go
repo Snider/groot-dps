@@ -133,26 +133,31 @@ func dotsFile(o core.Options) string {
 	return openSettings().Values().Dots
 }
 
-// openSettings opens the settings file. A broken one is reported and
-// replaced by the defaults for this run, so the meter still opens.
+// openSettings opens the settings file. A broken one is reported and the
+// defaults are used for this run, from memory: nothing is read from or
+// written anywhere else, so the meter still opens and the file stays as it was.
 func openSettings() *settings.Store {
 	r := settings.Open(settings.DefaultPath())
 	if !r.OK {
-		log.Printf("settings: %s (using defaults)", r.Error())
-		r = settings.Open(core.Path(core.TempDir(), "grootdps-defaults", "settings.yaml"))
+		log.Printf("settings: %s (using defaults; fix or delete the file)", r.Error())
+		return settings.Defaults()
 	}
 	return r.Value.(*settings.Store)
 }
 
 func showSettings(out io.Writer, s *settings.Store) core.Result {
 	v := s.Values()
+	path := s.Path()
+	if path == "" {
+		path = "(defaults: the settings file couldn't be read)"
+	}
 	io.WriteString(out, core.Sprintf(`%s
   history.keep_days  %d
   history.dir        %s
   meter.dots         %s
   window.x           %d
   window.y           %d
-`, s.Path(), v.KeepDays, v.HistoryDir, orNext(v.Dots), v.WindowX, v.WindowY))
+`, path, v.KeepDays, v.HistoryDir, orNext(v.Dots), v.WindowX, v.WindowY))
 	return core.Ok(nil)
 }
 

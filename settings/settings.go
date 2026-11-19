@@ -32,10 +32,18 @@ type Values struct {
 // Keys are the settings `grootdps set` accepts, in display order.
 var Keys = []string{"history.keep_days", "history.dir", "meter.dots", "window.x", "window.y"}
 
-// Store is the open settings file.
+// Store is the open settings file, or (from Defaults) none at all.
 type Store struct {
-	cfg *config.Config
+	cfg *config.Config // nil: defaults only, nothing read or written
 }
+
+// Defaults is a Store with no file behind it, for when the real one can't be
+// read: the meter still opens, and Set/SaveWindow refuse rather than write
+// somewhere else.
+//
+//	s := settings.Defaults()
+//	s.Values().KeepDays // 30
+func Defaults() *Store { return &Store{} }
 
 // Dir is GrootDPS's own folder: settings.yaml and fights/ live in it.
 //
@@ -67,11 +75,19 @@ func Open(path string) core.Result {
 	return core.Ok(&Store{cfg: r.Value.(*config.Config)})
 }
 
-// Path is the file this Store reads and writes.
-func (s *Store) Path() string { return s.cfg.Path() }
+// Path is the file this Store reads and writes ("" for Defaults).
+func (s *Store) Path() string {
+	if s.cfg == nil {
+		return ""
+	}
+	return s.cfg.Path()
+}
 
 // Values resolves every setting.
 func (s *Store) Values() Values {
+	if s.cfg == nil {
+		return Values{KeepDays: 30, HistoryDir: core.Path(Dir(), "fights"), WindowX: 40, WindowY: 120}
+	}
 	var v Values
 	s.cfg.Get("history.keep_days", &v.KeepDays)
 	s.cfg.Get("history.dir", &v.HistoryDir)
@@ -86,6 +102,9 @@ func (s *Store) Values() Values {
 //	s.Set("history.keep_days", "7")
 //	s.Set("window.x", "-1200") // a monitor to the left
 func (s *Store) Set(key, value string) core.Result {
+	if s.cfg == nil {
+		return core.Fail(core.E("settings.Set", "the settings file couldn't be read, so nothing is saved: fix or delete it first", nil))
+	}
 	var v any = value
 	switch key {
 	case "history.keep_days":
@@ -114,6 +133,9 @@ func (s *Store) Set(key, value string) core.Result {
 //
 //	x, y := win.Position(); s.SaveWindow(x, y)
 func (s *Store) SaveWindow(x, y int) core.Result {
+	if s.cfg == nil {
+		return core.Fail(core.E("settings.SaveWindow", "no settings file to save to", nil))
+	}
 	s.cfg.Set("window.x", x)
 	s.cfg.Set("window.y", y)
 	return s.cfg.Commit()
