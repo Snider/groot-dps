@@ -4,6 +4,8 @@
 //
 //	grootdps                                # live, from Npcap (Windows, where the game runs)
 //	grootdps -replay testdata/fight.pcapng  # a capture, at its own pace (develop anywhere)
+//	grootdps replay testdata/fight.pcapng   # the same, no window: fights print to the terminal
+//	grootdps fights 5                       # the last 5 saved fights
 //
 // The DoT allowlist (a JSON list of skill ids) is read from -dots, or from
 // dot_skill_ids.json next to the program. Without it DoT ticks don't count.
@@ -34,6 +36,15 @@ import (
 var frontend embed.FS
 
 func main() {
+	if len(os.Args) > 1 && !core.IsFlag(os.Args[1]) {
+		attachConsole() // before anything prints: the command's output needs somewhere to go
+	}
+	if c := commands(os.Stdout); isCommand(c, os.Args[1:]) {
+		if r := c.Cli().Run(os.Args[1:]...); !r.OK {
+			log.Fatal(r.Error())
+		}
+		return
+	}
 	replay := flag.String("replay", "", "play a .pcapng/.pcap instead of capturing live")
 	fast := flag.Bool("fast", false, "with -replay: as fast as it reads, not at the capture's pace")
 	dotsFile := flag.String("dots", "", "JSON list of DoT skill ids whose damage ticks count")

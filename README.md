@@ -15,6 +15,15 @@ When a fight you were in ends (killed, or quiet for 30s), the meter saves what i
 
 It's yours: read it, keep it, delete it. Nothing reads it but you. `-keep-days 7` keeps a week, `-keep-days 0` saves nothing, and `-history <folder>` puts it somewhere else.
 
+From a terminal, no window:
+```
+grootdps fights            # your last 10 fights, newest first
+grootdps fights 3          # the last 3
+grootdps replay fight.pcapng          # every fight in a capture, printed as it ends
+grootdps replay fight.pcapng --save   # and saved to your history
+```
+Both take `--history=<folder>`; replay also takes `--pace` (play at the capture's own speed) and `--dots=<file>`.
+
 ## No teleport needed
 Some meters only learn which character is yours when you load a zone, so you teleport around the open world before your row shows up. This one also listens for things the server only sends about you:
 

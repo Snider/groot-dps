@@ -3,8 +3,11 @@
 package history
 
 import (
+	"encoding/json"
 	"fmt"
 	"log"
+	"os"
+	"path/filepath"
 	"time"
 
 	core "github.com/dappcore/go"
@@ -114,4 +117,54 @@ func Label(v live.FightView) string {
 		label += " killed"
 	}
 	return label
+}
+
+// Saved is one fight read back from disk.
+type Saved struct {
+	Path string
+	live.FightFinished
+}
+
+// Recent reads back the newest n saved fights, newest first. Files that
+// aren't fights (or don't parse) are skipped, not fatal.
+//
+//	fights, err := history.Store{Dir: dir}.Recent(10)
+func (s Store) Recent(n int) ([]Saved, error) {
+	if s.Dir == "" || n <= 0 {
+		return nil, nil
+	}
+	days, err := os.ReadDir(s.Dir)
+	if os.IsNotExist(err) {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+	var out []Saved
+	for i := len(days) - 1; i >= 0 && len(out) < n; i-- { // ReadDir sorts by name: day folders sort by date
+		if _, err := time.Parse(dayLayout, days[i].Name()); !days[i].IsDir() || err != nil {
+			continue
+		}
+		day := filepath.Join(s.Dir, days[i].Name())
+		files, err := os.ReadDir(day)
+		if err != nil {
+			return out, err
+		}
+		for j := len(files) - 1; j >= 0 && len(out) < n; j-- {
+			path := filepath.Join(day, files[j].Name())
+			if files[j].IsDir() || filepath.Ext(path) != ".json" {
+				continue
+			}
+			b, err := os.ReadFile(path)
+			if err != nil {
+				continue
+			}
+			var f live.FightFinished
+			if json.Unmarshal(b, &f) != nil || f.At.IsZero() {
+				continue
+			}
+			out = append(out, Saved{Path: path, FightFinished: f})
+		}
+	}
+	return out, nil
 }

@@ -8,6 +8,8 @@ import (
 	"path/filepath"
 	"testing"
 	"time"
+
+	"groot/dps/live"
 )
 
 type fight struct {
@@ -79,5 +81,27 @@ func TestOffMeansNothingIsWritten(t *testing.T) {
 	}
 	if n, err := s.Cleanup(time.Now(), 30); n != 0 || err != nil {
 		t.Fatalf("%d, %v", n, err)
+	}
+}
+
+func TestRecentNewestFirstSkipsJunk(t *testing.T) {
+	s := Store{Dir: t.TempDir()}
+	day := func(d int, h int) time.Time { return time.Date(2026, 11, d, h, 0, 0, 0, time.UTC) }
+	for _, at := range []time.Time{day(17, 20), day(18, 9), day(18, 21)} {
+		if _, err := s.Save(at, "boss 1", live.FightFinished{At: at, Fight: live.FightView{NPC: 1}}); err != nil {
+			t.Fatal(err)
+		}
+	}
+	os.WriteFile(filepath.Join(s.Dir, "2026-11-18", "notes.json"), []byte("not a fight"), 0o644)
+	os.WriteFile(filepath.Join(s.Dir, "readme.txt"), nil, 0o644)
+	got, err := s.Recent(2)
+	if err != nil || len(got) != 2 || !got[0].At.Equal(day(18, 21)) || !got[1].At.Equal(day(18, 9)) {
+		t.Fatalf("%v %+v", err, got)
+	}
+	if all, _ := s.Recent(10); len(all) != 3 {
+		t.Fatalf("want 3, got %d", len(all))
+	}
+	if none, err := (Store{Dir: filepath.Join(s.Dir, "missing")}).Recent(5); err != nil || none != nil {
+		t.Fatalf("missing dir: %v %v", none, err)
 	}
 }
