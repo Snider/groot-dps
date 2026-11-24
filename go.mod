@@ -13,7 +13,7 @@ require (
 require (
 	github.com/adrg/xdg v0.5.3 // indirect
 	github.com/coder/websocket v1.8.14 // indirect
-	github.com/dappcore/go-io/go v0.16.0 // indirect
+	github.com/dappcore/go-io/go v0.16.1 // indirect
 	github.com/fsnotify/fsnotify v1.10.1 // indirect
 	github.com/go-ole/go-ole v1.3.0 // indirect
 	github.com/go-viper/mapstructure/v2 v2.5.0 // indirect
