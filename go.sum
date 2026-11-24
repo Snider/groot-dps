@@ -36,8 +36,8 @@ github.com/dappcore/config/go v0.20.0 h1:eZFtYntytlhLM59C3yff6x0iFHiSOLrtuMHZb+t
 github.com/dappcore/config/go v0.20.0/go.mod h1:DNN6Q7EiH114LiMLf8fADXJybZG6soshJ09vJ/hcd0k=
 github.com/dappcore/go v0.21.0 h1:wrQP95kbjfYGXVWlfXy8SJp0Cjdq6QuhjeAlSbzSROg=
 github.com/dappcore/go v0.21.0/go.mod h1:0wbxM1oMhcDWzFXP8iOuC90oW8/xt4mqJjElZ+cOVWI=
-github.com/dappcore/go-io/go v0.16.1 h1:8oq/QVpiRUYXc04oxoCe9Riix3wQLsPXI3x5o6myVa8=
-github.com/dappcore/go-io/go v0.16.1/go.mod h1:JQ6glCamapU04cabaEdjqPwpj1EgNGA/j+5Y/nYA5QY=
+github.com/dappcore/go-io/go v0.16.2 h1:MZc3n0t1jq49P157BaxLOlqiLyU9TUh3I7HwOEocj3Y=
+github.com/dappcore/go-io/go v0.16.2/go.mod h1:JQ6glCamapU04cabaEdjqPwpj1EgNGA/j+5Y/nYA5QY=
 github.com/davecgh/go-spew v1.1.0/go.mod h1:J7Y8YcW2NihsgmVo/mv3lAwl/skON4iLHjSsI+c5H38=
 github.com/davecgh/go-spew v1.1.2-0.20180830191138-d8f796af33cc h1:U9qPSI2PIWSS1VwoXQT9A3Wy9MM3WgvqSxFWenqJduM=
 github.com/davecgh/go-spew v1.1.2-0.20180830191138-d8f796af33cc/go.mod h1:J7Y8YcW2NihsgmVo/mv3lAwl/skON4iLHjSsI+c5H38=
