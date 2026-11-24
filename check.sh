@@ -10,7 +10,7 @@ missing=$(grep -L "^// SPDX-License-Identifier: EUPL-1.2" $(git ls-files "*.go")
 go vet ./...
 # The tests replay a made-up fight: generate it (captures stay out of git; the
 # fake one is deterministic, so this writes the same file every time).
-[ -f testdata/fake.pcap ] || go run ./cmd/fakefight testdata/fake.pcap
+[ -f testdata/fake.pcap ] || { mkdir -p testdata && go run ./cmd/fakefight testdata/fake.pcap; }
 go test ./...
 GOOS=windows GOARCH=amd64 CGO_ENABLED=0 go build ./...  # several packages: output discarded
 if [ "$1" = fuzz ]; then
