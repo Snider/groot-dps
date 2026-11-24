@@ -3,9 +3,7 @@
 package wire
 
 import (
-	"encoding/binary"
-	"errors"
-	"unicode/utf8"
+	core "github.com/dappcore/go"
 )
 
 // Roster is a 02 97 party roster. Members carry account ids, not the entity
@@ -28,7 +26,7 @@ type Member struct {
 	CombatPower      uint64
 }
 
-var ErrNotRoster = errors.New("roster: not a party roster")
+var ErrNotRoster = core.NewError("roster: not a party roster")
 
 // ParseRoster reads a party roster. Member records vary in width, so after
 // each one the walk re-finds the next by its header (A2Tools does the same).
@@ -43,7 +41,7 @@ func ParseRoster(p []byte) (Roster, error) {
 	h := reader{b: d}
 	r.Key = h.u32()
 	k := int(h.u8())
-	if h.err != nil || k < 1 || k > 40 || h.remaining() < k || !utf8.Valid(h.b[:k]) {
+	if h.err != nil || k < 1 || k > 40 || h.remaining() < k || !core.UTF8Valid(h.b[:k]) {
 		return Roster{}, ErrNotRoster
 	}
 	r.Title = string(h.b[:k])
@@ -65,7 +63,7 @@ func ParseRoster(p []byte) (Roster, error) {
 		}
 		m := Member{Slot: d[o+1]}
 		o += 2 // presence mask, slot
-		m.Account = binary.LittleEndian.Uint64(d[o:])
+		m.Account = core.LittleEndianUint64(d[o:])
 		m.Server = uint16(m.Account >> 48)
 		o += 8
 		k := int(d[o])
@@ -87,9 +85,9 @@ func ParseRoster(p []byte) (Roster, error) {
 		if o+12 > len(d) {
 			break
 		}
-		m.Class = ClassOf(binary.LittleEndian.Uint32(d[o:]))
-		m.Level = binary.LittleEndian.Uint32(d[o+4:])
-		m.GearScore = binary.LittleEndian.Uint32(d[o+8:])
+		m.Class = ClassOf(core.LittleEndianUint32(d[o:]))
+		m.Level = core.LittleEndianUint32(d[o+4:])
+		m.GearScore = core.LittleEndianUint32(d[o+8:])
 		o += 12
 		if m.Level < 1 || m.Level > 200 || m.GearScore > 1_000_000 {
 			break
@@ -108,7 +106,7 @@ func ParseRoster(p []byte) (Roster, error) {
 		if o+8 > len(d) {
 			break
 		}
-		m.CombatPower = binary.LittleEndian.Uint64(d[o:])
+		m.CombatPower = core.LittleEndianUint64(d[o:])
 		o += 8
 		if m.CombatPower > 100_000_000 {
 			break
@@ -135,7 +133,7 @@ func ParseRoster(p []byte) (Roster, error) {
 
 func findU16(d []byte, from, to int, want uint16) (int, bool) {
 	for i := from; i <= min(to, len(d)-2); i++ {
-		if binary.LittleEndian.Uint16(d[i:]) == want {
+		if core.LittleEndianUint16(d[i:]) == want {
 			return i, true
 		}
 	}
@@ -144,9 +142,9 @@ func findU16(d []byte, from, to int, want uint16) (int, bool) {
 
 func visitorWorld(d []byte, from int) (int, bool) {
 	for i := from; i < from+10 && i+13 <= len(d); i++ {
-		w := binary.LittleEndian.Uint16(d[i:])
+		w := core.LittleEndianUint16(d[i:])
 		tag := d[i+4]
-		power := binary.LittleEndian.Uint64(d[i+5:])
+		power := core.LittleEndianUint64(d[i+5:])
 		if w >= 1000 && w <= 2999 && tag >= 1 && tag <= 4 && power >= 1 && power <= 100_000_000 {
 			return i, true
 		}
@@ -161,11 +159,11 @@ func memberWithin(d []byte, from, span int, slot uint8) (int, bool) {
 		if d[i+1] != slot {
 			continue
 		}
-		if w := binary.LittleEndian.Uint16(d[i+8:]); w == 0 || w > 9_999 {
+		if w := core.LittleEndianUint16(d[i+8:]); w == 0 || w > 9_999 {
 			continue
 		}
 		k := int(d[i+10])
-		if k == 0 || k > 40 || i+11+k > len(d) || !utf8.Valid(d[i+11:i+11+k]) {
+		if k == 0 || k > 40 || i+11+k > len(d) || !core.UTF8Valid(d[i+11:i+11+k]) {
 			continue
 		}
 		return i, true

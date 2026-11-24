@@ -3,11 +3,7 @@
 package capture
 
 import (
-	"context"
-	"errors"
-	"fmt"
-	"sync"
-	"time"
+	core "github.com/dappcore/go"
 
 	"github.com/google/gopacket/pcap"
 )
@@ -15,10 +11,10 @@ import (
 // Live listens on every adapter (the game's traffic is on one of them; the
 // splitter only syncs on game frames, so the rest add nothing). Needs Npcap
 // on Windows. It only reads: the handles never send.
-func Live(ctx context.Context, h Handler, logf func(string, ...any)) error {
+func Live(ctx core.Context, h Handler, logf func(string, ...any)) error {
 	devs, err := pcap.FindAllDevs()
 	if err != nil {
-		return fmt.Errorf("no capture driver (install Npcap): %w", err)
+		return core.E("capture.Live", "no capture driver (install Npcap)", err)
 	}
 	var dir Direction // inbound = to one of this PC's addresses
 	for _, d := range devs {
@@ -26,11 +22,11 @@ func Live(ctx context.Context, h Handler, logf func(string, ...any)) error {
 			dir.Local = append(dir.Local, a.IP)
 		}
 	}
-	var mu sync.Mutex // h isn't asked to be safe for concurrent use
-	var wg sync.WaitGroup
+	var mu core.Mutex // h isn't asked to be safe for concurrent use
+	var wg core.WaitGroup
 	opened := 0
 	for _, d := range devs {
-		hd, err := pcap.OpenLive(d.Name, 65535, false, 250*time.Millisecond)
+		hd, err := pcap.OpenLive(d.Name, 65535, false, 250*core.Millisecond)
 		if err != nil {
 			logf("skip %s: %v", d.Description, err)
 			continue
@@ -48,7 +44,7 @@ func Live(ctx context.Context, h Handler, logf func(string, ...any)) error {
 			lt := hd.LinkType()
 			for ctx.Err() == nil {
 				data, ci, err := hd.ReadPacketData()
-				if errors.Is(err, pcap.NextErrorTimeoutExpired) {
+				if core.Is(err, pcap.NextErrorTimeoutExpired) {
 					continue
 				}
 				if err != nil {
@@ -62,7 +58,7 @@ func Live(ctx context.Context, h Handler, logf func(string, ...any)) error {
 		}()
 	}
 	if opened == 0 {
-		return errors.New("couldn't open any adapter (Npcap installed? run as admin if it was installed admin-only)")
+		return core.NewError("couldn't open any adapter (Npcap installed? run as admin if it was installed admin-only)")
 	}
 	logf("listening on %d adapters", opened)
 	wg.Wait()

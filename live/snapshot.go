@@ -3,7 +3,7 @@
 package live
 
 import (
-	"fmt"
+	core "github.com/dappcore/go"
 
 	"groot/dps/meter"
 )
@@ -75,5 +75,5 @@ func label(m *meter.Meter, id uint32) string {
 	if id == m.Me() {
 		return "You"
 	}
-	return fmt.Sprintf("#%d", id)
+	return core.Sprintf("#%d", id)
 }

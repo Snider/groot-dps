@@ -3,9 +3,7 @@
 package wire
 
 import (
-	"encoding/binary"
-	"errors"
-	"unicode/utf8"
+	core "github.com/dappcore/go"
 )
 
 // OpMobSpawnOld is 0x3641 before the June 2026 opcode shift.
@@ -18,7 +16,7 @@ const (
 	KindSummon = 0x5F // a summon or pet
 )
 
-var ErrNotSpawn = errors.New("spawn: not a spawn record")
+var ErrNotSpawn = core.NewError("spawn: not a spawn record")
 
 // Spawn is a 41 36 record: an NPC, a summon/pet or a skill effect. Never a
 // real player (they get 45 36).
@@ -57,7 +55,7 @@ func ParseSpawn(p []byte) (Spawn, error) {
 	off := len(d) - r.remaining()
 	var m [4]byte
 	copy(m[:], d[off:])
-	s.Mask = binary.LittleEndian.Uint32(m[:])
+	s.Mask = core.LittleEndianUint32(m[:])
 	s.Kind = d[off]
 
 	// The mask grew from u16 to u32, moving the byte that gates the name: try
@@ -132,7 +130,7 @@ func staggerGauge(d []byte) (maxG, cur uint32) {
 	if t[0] != 0x03 || t[1] != 0x01 || t[14] != 0x00 {
 		return 0, 0
 	}
-	maxG, cur = binary.LittleEndian.Uint32(t[2:]), binary.LittleEndian.Uint32(t[6:])
+	maxG, cur = core.LittleEndianUint32(t[2:]), core.LittleEndianUint32(t[6:])
 	if cur == 0 || cur > maxG || maxG > 100_000 {
 		return 0, 0
 	}
@@ -146,15 +144,15 @@ func parentKey(d []byte, from int, self uint32) uint32 {
 		if d[i-1] != 0x06 {
 			continue
 		}
-		owner := binary.LittleEndian.Uint32(d[i:])
-		if owner == 0 || owner > 9_999_999 || owner == self || binary.LittleEndian.Uint16(d[i+8:]) != 0 {
+		owner := core.LittleEndianUint32(d[i:])
+		if owner == 0 || owner > 9_999_999 || owner == self || core.LittleEndianUint16(d[i+8:]) != 0 {
 			continue
 		}
-		if w := binary.LittleEndian.Uint16(d[i+10:]); w == 0 || w > 9_999 {
+		if w := core.LittleEndianUint16(d[i+10:]); w == 0 || w > 9_999 {
 			continue
 		}
 		k := int(d[i+12])
-		if k > 40 || i+13+k > len(d) || !utf8.Valid(d[i+13:i+13+k]) {
+		if k > 40 || i+13+k > len(d) || !core.UTF8Valid(d[i+13:i+13+k]) {
 			continue
 		}
 		return owner
@@ -174,7 +172,7 @@ type Death struct {
 	Flag   uint32
 }
 
-var ErrNotDeath = errors.New("death: not a death record")
+var ErrNotDeath = core.NewError("death: not a death record")
 
 // ParseDeath reads <entity varint> <varint, always 0> <flag varint>.
 func ParseDeath(p []byte) (Death, error) {
@@ -202,7 +200,7 @@ type Kill struct {
 	Name   string
 }
 
-var ErrNotKill = errors.New("kill: not a kill record")
+var ErrNotKill = core.NewError("kill: not a kill record")
 
 // ParseKill reads <entity varint> <4 bytes> <owner varint> <server u16>
 // <len u8> <name> [<len u8> <server name> ...].

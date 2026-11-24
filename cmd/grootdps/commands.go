@@ -3,11 +3,6 @@
 package main
 
 import (
-	"io"
-	"log"
-	"os"
-	"strconv"
-
 	core "github.com/dappcore/go"
 
 	"groot/dps/history"
@@ -27,7 +22,7 @@ import (
 //	grootdps set history.keep_days 7        # change one, for good
 //
 // --dots and --history override the settings file for one run.
-func commands(out io.Writer) *core.Core {
+func commands(out core.Writer) *core.Core {
 	c := core.New(core.WithOption("name", "grootdps"), core.WithCli())
 	c.Command("replay", core.Command{Description: "play a capture without the window", Action: func(o core.Options) core.Result {
 		return replay(out, o)
@@ -60,13 +55,13 @@ func isCommand(c *core.Core, args []string) bool {
 	return len(args) > 0 && !core.IsFlag(args[0]) && c.Command(args[0]).OK
 }
 
-func replay(out io.Writer, o core.Options) core.Result {
+func replay(out core.Writer, o core.Options) core.Result {
 	file := o.String("_arg")
 	if file == "" {
 		return core.Fail(core.E("grootdps.replay", "which capture? grootdps replay <file.pcapng>", nil))
 	}
-	if _, err := os.Stat(file); err != nil {
-		return core.Fail(core.E("grootdps.replay", "can't read "+file, err))
+	if st := core.Stat(file); !st.OK {
+		return core.Fail(core.E("grootdps.replay", "can't read "+file, st.Err()))
 	}
 	keep := 0
 	if o.Bool("save") {
@@ -80,7 +75,7 @@ func replay(out io.Writer, o core.Options) core.Result {
 	)
 	core.On(c, func(f live.FightFinished) core.Result {
 		n++
-		io.WriteString(out, f.Fight.Text()+"\n")
+		core.WriteString(out, f.Fight.Text()+"\n")
 		return core.Ok(nil)
 	})
 	if r := c.ServiceStartup(core.Background(), nil); !r.OK {
@@ -91,16 +86,17 @@ func replay(out io.Writer, o core.Options) core.Result {
 		return r
 	}
 	if n == 0 {
-		io.WriteString(out, "no fights of yours in "+file+"\n")
+		core.WriteString(out, "no fights of yours in "+file+"\n")
 	}
 	return core.Ok(n)
 }
 
-func fights(out io.Writer, o core.Options) core.Result {
+func fights(out core.Writer, o core.Options) core.Result {
 	n := 10
 	if s := o.String("_arg"); s != "" {
-		v, err := strconv.Atoi(s)
-		if err != nil || v <= 0 {
+		parsed := core.Atoi(s)
+		v, _ := parsed.Value.(int)
+		if !parsed.OK || v <= 0 {
 			return core.Fail(core.E("grootdps.fights", "how many? grootdps fights 10", nil))
 		}
 		n = v
@@ -111,10 +107,10 @@ func fights(out io.Writer, o core.Options) core.Result {
 		return core.Fail(core.E("grootdps.fights", "reading "+dir, err))
 	}
 	if len(saved) == 0 {
-		io.WriteString(out, "no saved fights in "+dir+"\n")
+		core.WriteString(out, "no saved fights in "+dir+"\n")
 	}
 	for _, s := range saved {
-		io.WriteString(out, s.At.Local().Format("Mon 2 Jan 15:04")+" · "+s.Fight.Text()+"\n")
+		core.WriteString(out, s.At.Local().Format("Mon 2 Jan 15:04")+" · "+s.Fight.Text()+"\n")
 	}
 	return core.Ok(len(saved))
 }
@@ -139,19 +135,19 @@ func dotsFile(o core.Options) string {
 func openSettings() *settings.Store {
 	r := settings.Open(settings.DefaultPath())
 	if !r.OK {
-		log.Printf("settings: %s (using defaults; fix or delete the file)", r.Error())
+		core.Warn("settings unreadable: using defaults; fix or delete the file", "err", r.Error())
 		return settings.Defaults()
 	}
 	return r.Value.(*settings.Store)
 }
 
-func showSettings(out io.Writer, s *settings.Store) core.Result {
+func showSettings(out core.Writer, s *settings.Store) core.Result {
 	v := s.Values()
 	path := s.Path()
 	if path == "" {
 		path = "(defaults: the settings file couldn't be read)"
 	}
-	io.WriteString(out, core.Sprintf(`%s
+	core.WriteString(out, core.Sprintf(`%s
   history.keep_days  %d
   history.dir        %s
   meter.dots         %s

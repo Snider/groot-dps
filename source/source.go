@@ -12,10 +12,6 @@
 package source
 
 import (
-	"context"
-	"log"
-	"time"
-
 	core "github.com/dappcore/go"
 
 	"groot/dps/capture"
@@ -45,7 +41,7 @@ type Service struct {
 func Register(opts Options) func(*core.Core) core.Result {
 	return func(c *core.Core) core.Result {
 		s := &Service{ServiceRuntime: core.NewServiceRuntime(c, opts), Pipe: live.New(opts.Dots)}
-		s.Pipe.OnFinished = func(at time.Time, v live.FightView) { // before capture starts: no race
+		s.Pipe.OnFinished = func(at core.Time, v live.FightView) { // before capture starts: no race
 			c.ACTION(live.FightFinished{At: at, Fight: v})
 		}
 		return core.Ok(s)
@@ -61,13 +57,13 @@ func (s *Service) OnStartup(ctx core.Context) core.Result {
 		var err error
 		if opts.Replay != "" {
 			err = capture.Replay(ctx, opts.Replay, !opts.Fast, s.Pipe.Segment)
-			s.Pipe.Flush(time.Now()) // the file's over: so are its fights
-			log.Printf("replay finished: %d packets", s.Pipe.Snapshot().Packets)
+			s.Pipe.Flush(core.Now()) // the file's over: so are its fights
+			core.Info("replay finished", "packets", s.Pipe.Snapshot().Packets)
 		} else {
-			err = capture.Live(ctx, s.Pipe.Segment, log.Printf)
+			err = capture.Live(ctx, s.Pipe.Segment, func(format string, args ...any) { core.Info(core.Sprintf(format, args...)) })
 		}
-		if err != nil && ctx.Err() == nil && err != context.Canceled {
-			log.Printf("capture: %v", err)
+		if err != nil && ctx.Err() == nil && !core.Is(err, core.ContextCanceled) {
+			core.Error("capture stopped", "err", err)
 		}
 	})
 	return core.Ok(nil)
@@ -84,6 +80,6 @@ func (s *Service) OnShutdown(core.Context) core.Result {
 	if s.done != nil {
 		<-s.done
 	}
-	s.Pipe.Flush(time.Now())
+	s.Pipe.Flush(core.Now())
 	return core.Ok(nil)
 }

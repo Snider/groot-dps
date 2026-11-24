@@ -2,7 +2,7 @@
 
 package wire
 
-import "errors"
+import core "github.com/dappcore/go"
 
 // Tick is one damage-over-time or heal tick from a 0x3805 packet.
 type Tick struct {
@@ -26,7 +26,7 @@ const (
 	tickIntoShield = 0x04
 )
 
-var ErrNotTick = errors.New("not a tick packet")
+var ErrNotTick = core.NewError("not a tick packet")
 
 func (t Tick) Skill() uint32 { return t.Effect / 100 }
 func (t Tick) Heal() bool    { return t.Kind == TickHeal || t.Kind == TickHealB || t.Kind == TickHoT }

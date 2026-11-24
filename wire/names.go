@@ -3,11 +3,7 @@
 package wire
 
 import (
-	"encoding/binary"
-	"errors"
-	"strings"
-	"unicode"
-	"unicode/utf8"
+	core "github.com/dappcore/go"
 )
 
 // Class is a character class, from the class ids in self and party records.
@@ -45,7 +41,7 @@ func ClassOf(id uint32) Class {
 // OpPlayerSpawnOld is 0x3645 before the June 2026 opcode shift.
 const OpPlayerSpawnOld uint16 = 0x3644
 
-var ErrNotName = errors.New("identity: no name here")
+var ErrNotName = core.NewError("identity: no name here")
 
 // Identity binds an entity id to a character name: 33 36 is you, 45 36 anyone else.
 type Identity struct {
@@ -102,16 +98,16 @@ func ParseIdentity(p []byte) (Identity, error) {
 
 // exactName: 1-12 letters (any script) and digits, at least one letter.
 func exactName(s string) bool {
-	if !utf8.ValidString(s) {
+	if !core.UTF8ValidString(s) {
 		return false
 	}
 	n, letter := 0, false
 	for _, c := range s {
 		n++
 		switch {
-		case unicode.IsLetter(c):
+		case core.IsLetter(c):
 			letter = true
-		case unicode.IsNumber(c):
+		case core.IsNumber(c):
 		default:
 			return false
 		}
@@ -120,12 +116,12 @@ func exactName(s string) bool {
 }
 
 func placeholder(s string) bool {
-	rest, ok := strings.CutPrefix(s, "$")
+	rest, ok := core.CutPrefix(s, "$")
 	if !ok || len(rest) < 4 {
 		return false
 	}
 	for _, c := range rest {
-		if c > unicode.MaxASCII || !unicode.IsLetter(c) && !unicode.IsDigit(c) {
+		if c > core.MaxASCII || !core.IsLetter(c) && !core.IsDigit(c) {
 			return false
 		}
 	}
@@ -137,7 +133,7 @@ func (r *reader) u16() uint16 {
 		r.fail()
 		return 0
 	}
-	v := binary.LittleEndian.Uint16(r.b)
+	v := core.LittleEndianUint16(r.b)
 	r.b = r.b[2:]
 	return v
 }

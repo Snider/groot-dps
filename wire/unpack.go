@@ -3,7 +3,7 @@
 package wire
 
 import (
-	"encoding/binary"
+	core "github.com/dappcore/go"
 
 	"github.com/pierrec/lz4/v4"
 )
@@ -19,7 +19,7 @@ func Opcode(p []byte) (uint16, bool) {
 	if n <= 0 || len(p) < n+2 {
 		return 0, false
 	}
-	return binary.LittleEndian.Uint16(p[n:]), true
+	return core.LittleEndianUint16(p[n:]), true
 }
 
 // Unpack flattens a packet: a plain packet comes back as-is, an LZ4
@@ -93,7 +93,7 @@ func decompress(f []byte, budget *int) ([]byte, bool) {
 	if !ok || len(f) < h+6 {
 		return nil, false
 	}
-	size := binary.LittleEndian.Uint32(f[h+2:])
+	size := core.LittleEndianUint32(f[h+2:])
 	if size == 0 || int(size) > *budget {
 		return nil, false
 	}

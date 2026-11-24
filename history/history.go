@@ -5,12 +5,7 @@
 package history
 
 import (
-	"encoding/json"
-	"fmt"
-	"os"
-	"path/filepath"
-	"strings"
-	"time"
+	core "github.com/dappcore/go"
 )
 
 const dayLayout = "2006-01-02"
@@ -21,32 +16,34 @@ type Store struct {
 }
 
 // Save writes v as <Dir>/<day>/<hh-mm-ss> <label>.json and returns the path.
-func (s Store) Save(at time.Time, label string, v any) (string, error) {
+func (s Store) Save(at core.Time, label string, v any) (string, error) {
 	if s.Dir == "" {
 		return "", nil
 	}
-	day := filepath.Join(s.Dir, at.Format(dayLayout))
-	if err := os.MkdirAll(day, 0o755); err != nil {
-		return "", err
+	day := core.PathJoin(s.Dir, at.Format(dayLayout))
+	if r := core.MkdirAll(day, 0o755); !r.OK {
+		return "", r.Err()
 	}
-	b, err := json.MarshalIndent(v, "", "  ")
-	if err != nil {
-		return "", err
+	encoded := core.JSONMarshalIndent(v, "", "  ")
+	if !encoded.OK {
+		return "", encoded.Err()
 	}
+	b := encoded.Bytes()
 	base := at.Format("15-04-05") + " " + tame(label)
 	for n := 1; ; n++ {
 		name := base + ".json"
 		if n > 1 {
-			name = fmt.Sprintf("%s (%d).json", base, n)
+			name = core.Sprintf("%s (%d).json", base, n)
 		}
-		path := filepath.Join(day, name)
-		f, err := os.OpenFile(path, os.O_WRONLY|os.O_CREATE|os.O_EXCL, 0o644)
-		if os.IsExist(err) {
+		path := core.PathJoin(day, name)
+		opened := core.OpenFile(path, core.O_WRONLY|core.O_CREATE|core.O_EXCL, 0o644)
+		if !opened.OK && core.IsExist(opened.Err()) {
 			continue
 		}
-		if err != nil {
-			return "", err
+		if !opened.OK {
+			return "", opened.Err()
 		}
+		f := opened.Value.(*core.OSFile)
 		_, werr := f.Write(b)
 		if cerr := f.Close(); werr == nil {
 			werr = cerr
@@ -56,27 +53,31 @@ func (s Store) Save(at time.Time, label string, v any) (string, error) {
 }
 
 // Cleanup removes day folders more than keepDays old. Anything else in Dir is left alone.
-func (s Store) Cleanup(now time.Time, keepDays int) (int, error) {
+func (s Store) Cleanup(now core.Time, keepDays int) (int, error) {
 	if s.Dir == "" {
 		return 0, nil
 	}
-	entries, err := os.ReadDir(s.Dir)
-	if os.IsNotExist(err) {
+	if !core.Stat(s.Dir).OK {
 		return 0, nil
 	}
-	if err != nil {
-		return 0, err
+	listed := core.ReadDir(core.DirFS(s.Dir), ".")
+	if !listed.OK {
+		return 0, listed.Err()
 	}
+	entries := listed.Value.([]core.FsDirEntry)
+	// Deletes go through a core Fs rooted at the history folder: it can't
+	// reach outside it, and refuses a home or drive root on every OS.
+	fsys := (&core.Fs{}).New(s.Dir)
 	y, m, d := now.Date()
-	cutoff := time.Date(y, m, d, 0, 0, 0, 0, now.Location()).AddDate(0, 0, -keepDays)
+	cutoff := core.Date(y, m, d, 0, 0, 0, 0, now.Location()).AddDate(0, 0, -keepDays)
 	removed := 0
 	for _, e := range entries {
-		day, err := time.ParseInLocation(dayLayout, e.Name(), now.Location())
-		if !e.IsDir() || err != nil || !day.Before(cutoff) {
+		day := core.TimeParseInLocation(dayLayout, e.Name(), now.Location())
+		if !e.IsDir() || !day.OK || !day.Value.(core.Time).Before(cutoff) {
 			continue
 		}
-		if err := os.RemoveAll(filepath.Join(s.Dir, e.Name())); err != nil {
-			return removed, err
+		if r := fsys.DeleteAll(e.Name()); !r.OK {
+			return removed, r.Err()
 		}
 		removed++
 	}
@@ -86,14 +87,14 @@ func (s Store) Cleanup(now time.Time, keepDays int) (int, error) {
 // tame keeps a label to letters, digits, spaces and dashes, so a name from
 // the game can't make a path.
 func tame(s string) string {
-	s = strings.Map(func(r rune) rune {
+	s = core.MapRunes(func(r rune) rune {
 		switch {
 		case r >= 'a' && r <= 'z', r >= 'A' && r <= 'Z', r >= '0' && r <= '9', r == ' ', r == '-':
 			return r
 		}
 		return -1
 	}, s)
-	if s = strings.TrimSpace(s); s == "" {
+	if s = core.Trim(s); s == "" {
 		s = "fight"
 	}
 	if len(s) > 40 {

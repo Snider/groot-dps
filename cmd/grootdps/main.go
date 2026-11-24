@@ -16,13 +16,7 @@ package main
 
 import (
 	"embed"
-	"encoding/json"
 	"flag"
-	"log"
-	"net/http"
-	"os"
-	"path/filepath"
-	"sync"
 
 	core "github.com/dappcore/go"
 	"github.com/wailsapp/wails/v3/pkg/application"
@@ -37,12 +31,12 @@ import (
 var frontend embed.FS
 
 func main() {
-	if len(os.Args) > 1 && !core.IsFlag(os.Args[1]) {
+	if len(core.Args()) > 1 && !core.IsFlag(core.Args()[1]) {
 		core.AttachParentConsole() // before anything prints: the command's output needs somewhere to go
 	}
-	if c := commands(os.Stdout); isCommand(c, os.Args[1:]) {
-		if r := c.Cli().Run(os.Args[1:]...); !r.OK {
-			log.Fatal(r.Error())
+	if c := commands(core.Stdout()); isCommand(c, core.Args()[1:]) {
+		if r := c.Cli().Run(core.Args()[1:]...); !r.OK {
+			fatal(r.Error())
 		}
 		return
 	}
@@ -64,7 +58,7 @@ func main() {
 		core.WithServiceLock(),
 	)
 	if r := c.ServiceStartup(c.Context(), nil); !r.OK {
-		log.Fatal(r.Error())
+		fatal(r.Error())
 	}
 	src := core.MustServiceFor[*source.Service](c, "source")
 	hist := core.MustServiceFor[*history.Service](c, "history")
@@ -94,42 +88,42 @@ func main() {
 	win.RegisterHook(events.Common.WindowClosing, func(*application.WindowEvent) {
 		if x, y := win.Position(); x != saved.WindowX || y != saved.WindowY {
 			if r := prefs.SaveWindow(x, y); !r.OK { // opens where you left it next time
-				log.Printf("settings: %s", r.Error())
+				core.Warn("settings not saved", "err", r.Error())
 			}
 		}
 	})
 	err := app.Run()
 	c.ServiceShutdown(core.Background()) // saves a fight still going when the window closed
 	if err != nil {
-		log.Fatal(err)
+		fatal(err)
 	}
 }
 
 // api serves the window's files plus /api/meter (a snapshot), /api/reset and
 // /api/history (opens the fights folder).
-func api(pipe *live.Pipeline, store history.Store, files embed.FS) http.Handler {
-	mux := http.NewServeMux()
-	var connected sync.Once
-	mux.HandleFunc("GET /api/meter", func(w http.ResponseWriter, r *http.Request) {
-		connected.Do(func() { log.Printf("window connected") })
+func api(pipe *live.Pipeline, store history.Store, files embed.FS) core.Handler {
+	mux := &core.ServeMux{}
+	var connected core.Once
+	mux.HandleFunc("GET /api/meter", func(w core.ResponseWriter, r *core.Request) {
+		connected.Do(func() { core.Info("window connected") })
 		w.Header().Set("Content-Type", "application/json")
-		json.NewEncoder(w).Encode(pipe.Snapshot())
+		core.JSONNewEncoder(w).Encode(pipe.Snapshot())
 	})
-	mux.HandleFunc("POST /api/reset", func(w http.ResponseWriter, r *http.Request) {
+	mux.HandleFunc("POST /api/reset", func(w core.ResponseWriter, r *core.Request) {
 		pipe.Reset()
-		w.WriteHeader(http.StatusNoContent)
+		w.WriteHeader(core.StatusNoContent)
 	})
-	mux.HandleFunc("POST /api/history", func(w http.ResponseWriter, r *http.Request) {
+	mux.HandleFunc("POST /api/history", func(w core.ResponseWriter, r *core.Request) {
 		if store.Dir == "" {
-			http.Error(w, "history is off", http.StatusNotFound)
+			core.HTTPError(w, "history is off", core.StatusNotFound)
 			return
 		}
-		os.MkdirAll(store.Dir, 0o755)
+		core.MkdirAll(store.Dir, 0o755)
 		if err := application.Get().Browser.OpenFile(store.Dir); err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
+			core.HTTPError(w, err.Error(), core.StatusInternalServerError)
 			return
 		}
-		w.WriteHeader(http.StatusNoContent)
+		w.WriteHeader(core.StatusNoContent)
 	})
 	mux.Handle("/", application.BundledAssetFileServer(mustSub(files, "frontend")))
 	return mux
@@ -137,24 +131,24 @@ func api(pipe *live.Pipeline, store history.Store, files embed.FS) http.Handler 
 
 func loadDots(path string) map[uint32]bool {
 	if path == "" {
-		exe, err := os.Executable()
-		if err != nil {
+		exe := core.Executable()
+		if !exe.OK {
 			return nil
 		}
-		path = filepath.Join(filepath.Dir(exe), "dot_skill_ids.json")
-		if _, err := os.Stat(path); err != nil {
-			log.Printf("no dot_skill_ids.json next to the program: DoT ticks won't count")
+		path = core.PathJoin(core.PathDir(exe.Value.(string)), "dot_skill_ids.json")
+		if !core.Stat(path).OK {
+			core.Warn("no dot_skill_ids.json next to the program: DoT ticks won't count")
 			return nil
 		}
 	}
-	b, err := os.ReadFile(path)
-	if err != nil {
-		log.Printf("dots: %v", err)
+	read := core.ReadFile(path)
+	if !read.OK {
+		core.Warn("dots unreadable", "path", path, "err", read.Err())
 		return nil
 	}
 	var ids []uint32
-	if err := json.Unmarshal(b, &ids); err != nil {
-		log.Printf("dots %s: %v", path, err)
+	if r := core.JSONUnmarshal(read.Bytes(), &ids); !r.OK {
+		core.Warn("dots unreadable", "path", path, "err", r.Err())
 		return nil
 	}
 	dots := make(map[uint32]bool, len(ids))
@@ -162,4 +156,10 @@ func loadDots(path string) map[uint32]bool {
 		dots[id] = true
 	}
 	return dots
+}
+
+// fatal reports what stopped GrootDPS from starting, and exits.
+func fatal(v any) {
+	core.Error(core.Sprintf("%v", v))
+	core.Exit(1)
 }

@@ -36,6 +36,10 @@ github.com/dappcore/config/go v0.20.0 h1:eZFtYntytlhLM59C3yff6x0iFHiSOLrtuMHZb+t
 github.com/dappcore/config/go v0.20.0/go.mod h1:DNN6Q7EiH114LiMLf8fADXJybZG6soshJ09vJ/hcd0k=
 github.com/dappcore/go v0.18.0 h1:m7MFOfKtev41fMsHnzHb4+QtLmfa/ady4tSfipU2rn0=
 github.com/dappcore/go v0.18.0/go.mod h1:0wbxM1oMhcDWzFXP8iOuC90oW8/xt4mqJjElZ+cOVWI=
+github.com/dappcore/go v0.20.0 h1:oAHVApt/0E1gq8KgPOGAOioEV1/0LhxUf+C4OhJyLTw=
+github.com/dappcore/go v0.20.0/go.mod h1:0wbxM1oMhcDWzFXP8iOuC90oW8/xt4mqJjElZ+cOVWI=
+github.com/dappcore/go v0.21.0 h1:wrQP95kbjfYGXVWlfXy8SJp0Cjdq6QuhjeAlSbzSROg=
+github.com/dappcore/go v0.21.0/go.mod h1:0wbxM1oMhcDWzFXP8iOuC90oW8/xt4mqJjElZ+cOVWI=
 github.com/dappcore/go-io/go v0.16.0 h1:nVv/kAyvl0bsTNMCAd978yhb0BAP5hUauIeZ1DVmHJg=
 github.com/dappcore/go-io/go v0.16.0/go.mod h1:JQ6glCamapU04cabaEdjqPwpj1EgNGA/j+5Y/nYA5QY=
 github.com/davecgh/go-spew v1.1.0/go.mod h1:J7Y8YcW2NihsgmVo/mv3lAwl/skON4iLHjSsI+c5H38=

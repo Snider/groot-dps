@@ -4,7 +4,7 @@ go 1.26.5
 
 require (
 	github.com/dappcore/config/go v0.20.0
-	github.com/dappcore/go v0.18.0
+	github.com/dappcore/go v0.21.0
 	github.com/google/gopacket v1.1.19
 	github.com/pierrec/lz4/v4 v4.1.33
 	github.com/wailsapp/wails/v3 v3.0.0

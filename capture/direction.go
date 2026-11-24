@@ -2,15 +2,15 @@
 
 package capture
 
-import "net"
+import core "github.com/dappcore/go"
 
 // Direction tells server → client segments from the rest.
 type Direction struct {
-	Local []net.IP // this PC's addresses; empty for capture files
+	Local []core.IP // this PC's addresses; empty for capture files
 }
 
 // Inbound: is this segment coming to us from a server?
-func (d Direction) Inbound(src, dst net.IP, srcPort, dstPort uint16) bool {
+func (d Direction) Inbound(src, dst core.IP, srcPort, dstPort uint16) bool {
 	if len(d.Local) > 0 {
 		return d.local(dst) && !d.local(src)
 	}
@@ -23,7 +23,7 @@ func (d Direction) Inbound(src, dst net.IP, srcPort, dstPort uint16) bool {
 	return srcPort < dstPort // the server's port is below the client's ephemeral one
 }
 
-func (d Direction) local(ip net.IP) bool {
+func (d Direction) local(ip core.IP) bool {
 	for _, l := range d.Local {
 		if l.Equal(ip) {
 			return true
@@ -32,4 +32,4 @@ func (d Direction) local(ip net.IP) bool {
 	return false
 }
 
-func private(ip net.IP) bool { return ip.IsPrivate() || ip.IsLoopback() || ip.IsLinkLocalUnicast() }
+func private(ip core.IP) bool { return ip.IsPrivate() || ip.IsLoopback() || ip.IsLinkLocalUnicast() }

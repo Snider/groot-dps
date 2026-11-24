@@ -5,8 +5,7 @@ package meter
 // What the meter shows: rows per fight, the fights worth showing.
 
 import (
-	"cmp"
-	"slices"
+	core "github.com/dappcore/go"
 
 	"groot/dps/wire"
 )
@@ -77,10 +76,14 @@ func (m *Meter) Rows(target uint32) []Row {
 		for _, s := range skills[o] {
 			r.Skills = append(r.Skills, *s)
 		}
-		slices.SortFunc(r.Skills, func(a, b SkillRow) int { return cmp.Or(cmp.Compare(b.Amount, a.Amount), cmp.Compare(a.Skill, b.Skill)) })
+		core.SliceSortFunc(r.Skills, func(a, b SkillRow) bool {
+			return core.Coalesce(core.Compare(b.Amount, a.Amount), core.Compare(a.Skill, b.Skill)) < 0
+		})
 		rows = append(rows, *r)
 	}
-	slices.SortFunc(rows, func(a, b Row) int { return cmp.Or(cmp.Compare(b.Amount, a.Amount), cmp.Compare(a.Actor, b.Actor)) })
+	core.SliceSortFunc(rows, func(a, b Row) bool {
+		return core.Coalesce(core.Compare(b.Amount, a.Amount), core.Compare(a.Actor, b.Actor)) < 0
+	})
 	return rows
 }
 
@@ -101,7 +104,9 @@ func (m *Meter) HealRows(target uint32) []HealRow {
 	for id, amt := range by {
 		rows = append(rows, HealRow{Actor: id, Amount: amt, PerSecond: float64(amt) / secs})
 	}
-	slices.SortFunc(rows, func(a, b HealRow) int { return cmp.Or(cmp.Compare(b.Amount, a.Amount), cmp.Compare(a.Actor, b.Actor)) })
+	core.SliceSortFunc(rows, func(a, b HealRow) bool {
+		return core.Coalesce(core.Compare(b.Amount, a.Amount), core.Compare(a.Actor, b.Actor)) < 0
+	})
 	return rows
 }
 
@@ -113,8 +118,8 @@ func (m *Meter) Fights() []*Fight {
 			out = append(out, f)
 		}
 	}
-	slices.SortFunc(out, func(a, b *Fight) int {
-		return cmp.Or(boolCmp(b.Boss, a.Boss), cmp.Compare(b.Total, a.Total), cmp.Compare(a.Target, b.Target))
+	core.SliceSortFunc(out, func(a, b *Fight) bool {
+		return core.Coalesce(boolCmp(b.Boss, a.Boss), core.Compare(b.Total, a.Total), core.Compare(a.Target, b.Target)) < 0
 	})
 	return out
 }

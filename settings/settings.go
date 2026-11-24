@@ -14,8 +14,6 @@
 package settings
 
 import (
-	"strconv"
-
 	config "github.com/dappcore/config/go"
 	core "github.com/dappcore/go"
 )
@@ -108,14 +106,16 @@ func (s *Store) Set(key, value string) core.Result {
 	var v any = value
 	switch key {
 	case "history.keep_days":
-		n, err := strconv.Atoi(value)
-		if err != nil || n < 0 {
+		parsed := core.Atoi(value)
+		n, _ := parsed.Value.(int)
+		if !parsed.OK || n < 0 {
 			return core.Fail(core.E("settings.Set", "history.keep_days is a number of days, 0 or more", nil))
 		}
 		v = n
 	case "window.x", "window.y":
-		n, err := strconv.Atoi(value)
-		if err != nil {
+		parsed := core.Atoi(value)
+		n, _ := parsed.Value.(int)
+		if !parsed.OK {
 			return core.Fail(core.E("settings.Set", key+" is a whole number of pixels", nil))
 		}
 		v = n

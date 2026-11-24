@@ -2,12 +2,13 @@
 
 package main
 
-import "io/fs"
+import core "github.com/dappcore/go"
 
-func mustSub(f fs.FS, dir string) fs.FS {
-	sub, err := fs.Sub(f, dir)
-	if err != nil {
-		panic(err)
+// mustSub is dir inside an embedded FS (always there: it's compiled in).
+func mustSub(f core.FS, dir string) core.FS {
+	r := core.Sub(f, dir)
+	if !r.OK {
+		panic(r.Error())
 	}
-	return sub
+	return r.Value.(core.FS)
 }

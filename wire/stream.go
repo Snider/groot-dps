@@ -3,8 +3,8 @@
 package wire
 
 import (
-	"bytes"
 	"encoding/binary"
+	core "github.com/dappcore/go"
 )
 
 const (
@@ -42,7 +42,7 @@ func (s *Splitter) Feed(data []byte) [][]byte {
 	for off < len(s.buf) {
 		rest := s.buf[off:]
 		if !s.synced {
-			i := bytes.Index(rest, syncPattern)
+			i := core.BytesIndex(rest, syncPattern)
 			if i < 0 {
 				// Keep a tail in case the pattern straddles the next chunk.
 				off = max(off, len(s.buf)-(len(syncPattern)-1))
@@ -84,8 +84,8 @@ func (s *Splitter) Feed(data []byte) [][]byte {
 			break
 		}
 		p := rest[:size]
-		if !(size == keepaliveLen && bytes.HasPrefix(p, syncPattern)) {
-			out = append(out, bytes.Clone(p))
+		if !(size == keepaliveLen && core.BytesHasPrefix(p, syncPattern)) {
+			out = append(out, core.SliceClone(p))
 		}
 		off += size
 	}
@@ -102,7 +102,7 @@ func tlsRecord(b []byte) (int, bool) {
 	if len(b) < 5 || b[0] < 0x14 || b[0] > 0x17 || b[1] != 0x03 || b[2] < 0x01 || b[2] > 0x04 {
 		return 0, false
 	}
-	n := int(binary.BigEndian.Uint16(b[3:5]))
+	n := int(core.BigEndianUint16(b[3:5]))
 	return 5 + n, n > 0 && n <= 16384+256
 }
 
@@ -111,6 +111,6 @@ func bundleHeader(b []byte) bool {
 	if len(b) < 6 || b[0] != 0xFF || b[1] != 0xFF {
 		return false
 	}
-	size := binary.LittleEndian.Uint32(b[2:6])
+	size := core.LittleEndianUint32(b[2:6])
 	return size > 0 && size <= maxBundleClaim
 }

@@ -3,13 +3,6 @@
 package history
 
 import (
-	"encoding/json"
-	"fmt"
-	"log"
-	"os"
-	"path/filepath"
-	"time"
-
 	core "github.com/dappcore/go"
 
 	"groot/dps/live"
@@ -47,7 +40,7 @@ func Register(opts Options) func(*core.Core) core.Result {
 			select {
 			case s.queue <- f:
 			default:
-				log.Printf("history: queue full, a fight wasn't saved")
+				core.Warn("history: queue full, a fight wasn't saved")
 			}
 			return core.Ok(nil)
 		})
@@ -62,7 +55,7 @@ func (s *Service) OnStartup(ctx core.Context) core.Result {
 	}
 	s.cleanup()
 	s.Core().Go(func() {
-		daily := time.NewTicker(24 * time.Hour)
+		daily := core.NewTicker(24 * core.Hour)
 		defer daily.Stop()
 		for {
 			select {
@@ -93,15 +86,15 @@ func (s *Service) OnShutdown(core.Context) core.Result {
 
 func (s *Service) save(f live.FightFinished) {
 	if _, err := s.Store.Save(f.At, Label(f.Fight), f); err != nil {
-		log.Printf("history: %v", err)
+		core.Warn("history: couldn't save a fight", "err", err)
 	}
 }
 
 func (s *Service) cleanup() {
-	if n, err := s.Store.Cleanup(time.Now(), s.Options().KeepDays); err != nil {
-		log.Printf("history cleanup: %v", err)
+	if n, err := s.Store.Cleanup(core.Now(), s.Options().KeepDays); err != nil {
+		core.Warn("history cleanup failed", "err", err)
 	} else if n > 0 {
-		log.Printf("history: cleared %d old days", n)
+		core.Info("history: cleared old days", "days", n)
 	}
 }
 
@@ -109,9 +102,9 @@ func (s *Service) cleanup() {
 //
 //	history.Label(v) // "boss 2401 killed"
 func Label(v live.FightView) string {
-	label := fmt.Sprintf("fight %d", v.NPC)
+	label := core.Sprintf("fight %d", v.NPC)
 	if v.Boss {
-		label = fmt.Sprintf("boss %d", v.NPC)
+		label = core.Sprintf("boss %d", v.NPC)
 	}
 	if v.Killed {
 		label += " killed"
@@ -133,34 +126,36 @@ func (s Store) Recent(n int) ([]Saved, error) {
 	if s.Dir == "" || n <= 0 {
 		return nil, nil
 	}
-	days, err := os.ReadDir(s.Dir)
-	if os.IsNotExist(err) {
+	if !core.Stat(s.Dir).OK {
 		return nil, nil
 	}
-	if err != nil {
-		return nil, err
+	listed := core.ReadDir(core.DirFS(s.Dir), ".")
+	if !listed.OK {
+		return nil, listed.Err()
 	}
+	days := listed.Value.([]core.FsDirEntry)
 	var out []Saved
 	for i := len(days) - 1; i >= 0 && len(out) < n; i-- { // ReadDir sorts by name: day folders sort by date
-		if _, err := time.Parse(dayLayout, days[i].Name()); !days[i].IsDir() || err != nil {
+		if !days[i].IsDir() || !core.TimeParse(dayLayout, days[i].Name()).OK {
 			continue
 		}
-		day := filepath.Join(s.Dir, days[i].Name())
-		files, err := os.ReadDir(day)
-		if err != nil {
-			return out, err
+		day := core.PathJoin(s.Dir, days[i].Name())
+		inDay := core.ReadDir(core.DirFS(day), ".")
+		if !inDay.OK {
+			return out, inDay.Err()
 		}
+		files := inDay.Value.([]core.FsDirEntry)
 		for j := len(files) - 1; j >= 0 && len(out) < n; j-- {
-			path := filepath.Join(day, files[j].Name())
-			if files[j].IsDir() || filepath.Ext(path) != ".json" {
+			path := core.PathJoin(day, files[j].Name())
+			if files[j].IsDir() || core.PathExt(path) != ".json" {
 				continue
 			}
-			b, err := os.ReadFile(path)
-			if err != nil {
+			read := core.ReadFile(path)
+			if !read.OK {
 				continue
 			}
 			var f live.FightFinished
-			if json.Unmarshal(b, &f) != nil || f.At.IsZero() {
+			if !core.JSONUnmarshal(read.Bytes(), &f).OK || f.At.IsZero() {
 				continue
 			}
 			out = append(out, Saved{Path: path, FightFinished: f})

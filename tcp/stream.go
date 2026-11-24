@@ -3,7 +3,7 @@
 // Package tcp puts one direction of a TCP connection back in order.
 package tcp
 
-import "bytes"
+import core "github.com/dappcore/go"
 
 // maxPending is how many out-of-order segments we hold before deciding the
 // missing one is gone for good (lost at capture, not retransmitted to us).
@@ -30,7 +30,7 @@ func (s *Stream) Push(seq uint32, payload []byte) (out []byte, gap bool) {
 		s.pending = map[uint32][]byte{}
 	}
 	if int32(seq-s.next) > 0 {
-		s.pending[seq] = bytes.Clone(payload)
+		s.pending[seq] = core.SliceClone(payload)
 		if len(s.pending) <= maxPending {
 			return nil, false
 		}

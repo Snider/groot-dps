@@ -5,8 +5,7 @@
 package live
 
 import (
-	"sync"
-	"time"
+	core "github.com/dappcore/go"
 
 	"groot/dps/meter"
 	"groot/dps/tcp"
@@ -15,29 +14,29 @@ import (
 
 const (
 	maxFlows    = 64
-	pruneEvery  = 30 * time.Second
-	finishEvery = 2 * time.Second
+	pruneEvery  = 30 * core.Second
+	finishEvery = 2 * core.Second
 )
 
 type flow struct {
 	stream tcp.Stream
 	split  wire.Splitter
-	seen   time.Time
+	seen   core.Time
 }
 
 // Pipeline: server → client TCP segments in, meter snapshots out.
 type Pipeline struct {
-	mu      sync.Mutex
+	mu      core.Mutex
 	m       *meter.Meter
 	flows   map[string]*flow
 	packets int
-	pruned  time.Time
+	pruned  core.Time
 
 	// OnFinished, if set, gets each fight you were in once it's over (killed,
 	// or quiet for 30s) and long enough to count. Called with the lock held:
 	// don't call back into the pipeline.
-	OnFinished func(at time.Time, v FightView)
-	checked    time.Time
+	OnFinished func(at core.Time, v FightView)
+	checked    core.Time
 	handedOver map[fightKey]bool
 }
 
@@ -52,7 +51,7 @@ func New(dotSkills map[uint32]bool) *Pipeline {
 
 // Segment takes one server → client TCP segment. flow names the connection
 // (any stable string, e.g. "1.2.3.4:5555>10.0.0.2:50123").
-func (p *Pipeline) Segment(at time.Time, flowKey string, seq uint32, payload []byte) {
+func (p *Pipeline) Segment(at core.Time, flowKey string, seq uint32, payload []byte) {
 	p.mu.Lock()
 	defer p.mu.Unlock()
 	f := p.flows[flowKey]
@@ -86,7 +85,7 @@ func (p *Pipeline) Segment(at time.Time, flowKey string, seq uint32, payload []b
 
 func (p *Pipeline) dropOldest() {
 	var oldest string
-	var t time.Time
+	var t core.Time
 	for k, f := range p.flows {
 		if oldest == "" || f.seen.Before(t) {
 			oldest, t = k, f.seen
@@ -96,7 +95,7 @@ func (p *Pipeline) dropOldest() {
 }
 
 // handOver passes on fights that just finished, before Prune can drop them.
-func (p *Pipeline) handOver(at time.Time) {
+func (p *Pipeline) handOver(at core.Time) {
 	now := at.UnixMilli()
 	live := map[fightKey]bool{}
 	for _, f := range p.m.Fights() {
@@ -181,7 +180,7 @@ func (p *Pipeline) With(fn func(*meter.Meter)) {
 
 // Flush hands over every fight of yours long enough to count that hasn't
 // been yet, finished or not (for closing the meter mid-fight).
-func (p *Pipeline) Flush(at time.Time) {
+func (p *Pipeline) Flush(at core.Time) {
 	p.mu.Lock()
 	defer p.mu.Unlock()
 	if p.OnFinished == nil {

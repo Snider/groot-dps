@@ -3,9 +3,7 @@
 package wire
 
 import (
-	"encoding/binary"
-	"errors"
-	"math"
+	core "github.com/dappcore/go"
 )
 
 // Damage is one hit from a 0x3804 record (layout: plans/protocol.md).
@@ -52,12 +50,12 @@ func (d Damage) Back() bool    { return d.Angle == AngleBack }
 func (d Damage) Front() bool   { return d.Angle == AngleFront }
 
 var (
-	ErrNotDamage = errors.New("not a damage packet")
-	ErrSwitch    = errors.New("damage: bad switch value")
-	ErrSelfHit   = errors.New("damage: actor == target")
-	ErrSkill     = errors.New("damage: skill out of range")
-	ErrShort     = errors.New("damage: packet too short")
-	ErrAmount    = errors.New("damage: amount out of range")
+	ErrNotDamage = core.NewError("not a damage packet")
+	ErrSwitch    = core.NewError("damage: bad switch value")
+	ErrSelfHit   = core.NewError("damage: actor == target")
+	ErrSkill     = core.NewError("damage: skill out of range")
+	ErrShort     = core.NewError("damage: packet too short")
+	ErrAmount    = core.NewError("damage: amount out of range")
 )
 
 // ParseDamage decodes the first record of a 0x3804 packet.
@@ -183,7 +181,7 @@ func (r *reader) varint() uint64 {
 // varint32 is the game's varint: at most 5 bytes, never past int32.
 func (r *reader) varint32() uint32 {
 	v, n := uvarint(r.b)
-	if n <= 0 || n > 5 || v > math.MaxInt32 {
+	if n <= 0 || n > 5 || v > core.MaxInt32 {
 		r.fail()
 		return 0
 	}
@@ -206,7 +204,7 @@ func (r *reader) u32() uint32 {
 		r.fail()
 		return 0
 	}
-	v := binary.LittleEndian.Uint32(r.b)
+	v := core.LittleEndianUint32(r.b)
 	r.b = r.b[4:]
 	return v
 }
