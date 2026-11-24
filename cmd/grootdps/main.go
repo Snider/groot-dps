@@ -38,7 +38,7 @@ var frontend embed.FS
 
 func main() {
 	if len(os.Args) > 1 && !core.IsFlag(os.Args[1]) {
-		attachConsole() // before anything prints: the command's output needs somewhere to go
+		core.AttachParentConsole() // before anything prints: the command's output needs somewhere to go
 	}
 	if c := commands(os.Stdout); isCommand(c, os.Args[1:]) {
 		if r := c.Cli().Run(os.Args[1:]...); !r.OK {
